@@ -28,6 +28,7 @@ class HighLevelDDPG(DDPG):
         memory: Optional[Union[Memory, Tuple[Memory]]] = None,
         observation_space: Optional[Union[int, Tuple[int], gymnasium.Space]] = None,
         action_space: Optional[Union[int, Tuple[int], gymnasium.Space]] = None,
+        goal_action_space: Optional[Union[int, Tuple[int], gymnasium.Space]] = None,
         device: Optional[Union[str, torch.device]] = None,
         cfg: Optional[dict] = None,
     ) -> None:
@@ -44,9 +45,12 @@ class HighLevelDDPG(DDPG):
             cfg=_cfg,
         )
 
+        self.goal_action_space = goal_action_space
+        self.scale = torch.Tensor(self.goal_action_space.high)
+
     def init(self, trainer_cfg: Optional[Mapping[str, Any]] = None) -> None:
         """Initialize the agent"""
-        super().init(trainer_cfg=trainer_cfg)
+        Agent.init(self, trainer_cfg=trainer_cfg)
         self.set_mode("eval")
 
         assert len(self.secondary_memories) == 1
@@ -85,6 +89,7 @@ class HighLevelDDPG(DDPG):
         next_states: torch.Tensor,
         terminated: torch.Tensor,
         truncated: torch.Tensor,
+        low_level_policy,
         infos: Any,
         timestep: int,
         timesteps: int,
@@ -114,7 +119,7 @@ class HighLevelDDPG(DDPG):
         """
 
         assert len(self.secondary_memories) == 1
-        Agent().record_transition(
+        Agent.record_transition(
             self, states, actions, rewards, next_states, terminated, truncated, infos, timestep, timesteps
         )
 
@@ -128,7 +133,6 @@ class HighLevelDDPG(DDPG):
                                                )
 
         if self.secondary_memories[0].filled:
-            
             (
                 sampled_states,
                 sampled_goals,
@@ -154,7 +158,8 @@ class HighLevelDDPG(DDPG):
                                            rewards= sampled_rewards,
                                            next_states= sampled_next_states,
                                            terminated= sampled_terminated,
-                                           truncated= sampled_truncated)
+                                           truncated= sampled_truncated,
+                                           low_level_policy=low_level_policy)
             
             self.memory.add_samples(states=states,
                                     actions=goals,
@@ -163,6 +168,56 @@ class HighLevelDDPG(DDPG):
                                     terminated=terminated,
                                     truncated=truncated)
 
+    def sample(self, 
+               state: torch.Tensor, 
+               next_state: torch.Tensor, 
+               action: torch.Tensor, 
+               states: torch.Tensor,
+               actions: torch.Tensor, 
+               low_level_policy,
+               k: int= 8):
+        
+        diff_goal = (next_state - state).reshape(-1, state.shape[0])
+
+        original_goal = action[0,:]
+        original_goal = original_goal.reshape(-1, original_goal.shape[0])
+        random_goals = torch.normal(mean=diff_goal.expand(k,-1), std=.5*self.scale[None, :])
+        random_goals = random_goals.clip(-self.scale, self.scale)
+
+        candidates = torch.concat([original_goal, diff_goal, random_goals], dim=0)
+
+        # For ease
+        seq_len = states.shape[0]
+        action_dim = actions.shape[-1]
+        obs_dim = state.shape[0]
+        ncands = candidates.shape[0]
+
+        true_actions = actions
+        observations = states
+        goal_shape = (seq_len, obs_dim)
+        # observations = get_obs_tensor(observations, sg_corrections=True)
+
+        # batched_candidates = np.tile(candidates, [seq_len, 1, 1])
+        # batched_candidates = batched_candidates.transpose(1, 0, 2)
+
+        policy_actions = torch.zeros((ncands,seq_len, action_dim))
+        for c in range(ncands):
+            subgoal = candidates[c]
+            candidate = (subgoal + states[:, :obs_dim]) - states[:, :obs_dim]
+            candidate = candidate.reshape(*goal_shape)
+            combined_state = torch.concat([observations, candidate], dim= 1)
+            policy_actions[c] = low_level_policy.policy.act({"states": low_level_policy._state_preprocessor(combined_state)}, role="policy")[0]
+
+        difference = (policy_actions - true_actions)
+        difference = np.where(difference != -np.inf, difference, 0)
+        difference = difference.reshape((ncands, seq_len, action_dim)).transpose(0, 1, 2)
+
+        logprob = -0.5*np.sum(np.linalg.norm(difference, axis=-1)**2, axis=-1)
+        max_indices = np.argmax(logprob, axis=-1)
+
+        return candidates[max_indices,:]
+
+    
     def off_policy_correction(self,
                               states: torch.Tensor,
                               goals: torch.Tensor,
@@ -170,9 +225,19 @@ class HighLevelDDPG(DDPG):
                               rewards: torch.Tensor,
                               next_states: torch.Tensor,
                               terminated: torch.Tensor,
-                              truncated: torch.Tensor):
+                              truncated: torch.Tensor,
+                              low_level_policy):
         
-        pass
+        
+        corrected_states = states[0,:]
+        corrected_next_states = next_states[-1,:]
+        currected_terminated = terminated[-1,:]
+        currected_truncated = truncated[-1,:]
+        corrected_rewards = torch.sum(rewards)
+
+        corrected_goal = self.sample(corrected_states, corrected_next_states, goals, states, actions, low_level_policy)
+
+        return corrected_states, corrected_goal, corrected_rewards, corrected_next_states, currected_terminated, currected_truncated 
 
 class HIROAgent:
 
@@ -183,6 +248,8 @@ class HIROAgent:
         high_memory: Optional[Union[Memory, Tuple[Memory]]] = None,
         low_memory: Optional[Union[Memory, Tuple[Memory]]] = None,
         observation_space: Optional[Union[int, Tuple[int], gymnasium.Space]] = None,
+        goal_observed_space: Optional[Union[int, Tuple[int], gymnasium.Space]] = None,
+        goal_action_space: Optional[Union[int, Tuple[int], gymnasium.Space]] = None,
         action_space: Optional[Union[int, Tuple[int], gymnasium.Space]] = None,
         device: Optional[Union[str, torch.device]] = None,
         cfg: Optional[dict] = None,
@@ -195,12 +262,13 @@ class HIROAgent:
                           memory= high_memory,
                           observation_space= observation_space,
                           action_space= action_space,
+                          goal_action_space= goal_action_space,
                           device= device,
                           cfg= _cfg)
         
         self.low_agent = DDPG(models= low_models,
                           memory= low_memory,
-                          observation_space= observation_space,
+                          observation_space= goal_observed_space,
                           action_space= action_space,
                           device= device,
                           cfg= _cfg)
@@ -230,8 +298,7 @@ class HIROAgent:
             goal = goals
         
 
-        low_level_states = torch.concat([states, goal])
-
+        low_level_states = torch.concat([states, goal], dim= -1)
         actions, _, outputs = self.low_agent.act(states = low_level_states,timestep= timestep, timesteps = timesteps)
         
         return goal, actions, None, outputs
@@ -257,6 +324,7 @@ class HIROAgent:
                                           next_states, 
                                           terminated, 
                                           truncated, 
+                                          self.low_agent,
                                           infos, 
                                           timestep, 
                                           timesteps)
@@ -301,7 +369,9 @@ class HIROAgent:
     
     def post_interaction(self, timestep: int, timesteps: int):
 
-        self.high_agent.post_interaction(timestep= timestep, timesteps= timesteps)
+        if timestep % self._high_policy_sample_step == 0 and self.high_agent.memory.memory_index > 0:
+            self.high_agent.post_interaction(timestep= timestep, timesteps= timesteps)
+        
         self.low_agent.post_interaction(timestep= timestep, timesteps= timesteps)
 
     def track_data(self, tag: str, value: float):

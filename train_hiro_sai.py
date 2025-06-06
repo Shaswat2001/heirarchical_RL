@@ -9,117 +9,79 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 # import the skrl components to build the RL system
-from agents.hiro.hiro import HIROAgent, HIGH_LEVEL_DDPG_DEFAULT_CONFIG, HIRO_DEFAULT_CONFIG
+from agents.hiro.hiro import HIROAgent, HIRO_DEFAULT_CONFIG
 from skrl.envs.wrappers.torch import wrap_env
 from skrl.memories.torch import RandomMemory
-from skrl.models.torch import DeterministicMixin, GaussianMixin, Model
+from networks.torch.mlp import DeterministicActor, Critic
 from skrl.trainers.torch import SequentialTrainer
 from skrl.utils import set_seed
-
+from trainers.hiro_trainer import HiroTrainer
 
 # seed for reproducibility
 set_seed()  # e.g. `set_seed(42)` for fixed seed
-
-class HighLevelEnvWrapper(ActionWrapper):
-
-    def __init__(self, env):
-        super().__init__(env)
-
-        self.observation_space = env.observation_space
-        self.action_space = Box(low = -0.1, high = 0.1, shape = env.observation_space.shape, dtype= np.float32)
-
-class LowLevelEnvWrapper(ObservationWrapper):
-
-    def __init__(self, env):
-        super().__init__(env)
-
-        self.observation_space = env.observation_space
-        self.observation_space = Box(low = -0.1, high = 0.1, shape = env.observation_space.shape, dtype= np.float32)
-
-# define models (stochastic and deterministic models) using mixins
-class Actor(GaussianMixin, Model):
-    def __init__(self, observation_space, action_space, device, clip_actions=False,
-                 clip_log_std=True, min_log_std=-20, max_log_std=2, reduction="sum"):
-        Model.__init__(self, observation_space, action_space, device)
-        GaussianMixin.__init__(self, clip_actions, clip_log_std, min_log_std, max_log_std, reduction)
-
-        self.linear_layer_1 = nn.Linear(self.num_observations, 400)
-        self.linear_layer_2 = nn.Linear(400, 300)
-        self.action_layer = nn.Linear(300, self.num_actions)
-
-        self.log_std_parameter = nn.Parameter(torch.zeros(self.num_actions))
-
-    def compute(self, inputs, role):
-        x = F.relu(self.linear_layer_1(inputs["states"]))
-        x = F.relu(self.linear_layer_2(x))
-        # Pendulum-v1 action_space is -2 to 2
-        return 2 * torch.tanh(self.action_layer(x)), self.log_std_parameter, {}
-
-class Critic(DeterministicMixin, Model):
-    def __init__(self, observation_space, action_space, device, clip_actions=False):
-        Model.__init__(self, observation_space, action_space, device)
-        DeterministicMixin.__init__(self, clip_actions)
-
-        self.linear_layer_1 = nn.Linear(self.num_observations + self.num_actions, 400)
-        self.linear_layer_2 = nn.Linear(400, 300)
-        self.linear_layer_3 = nn.Linear(300, 1)
-
-    def compute(self, inputs, role):
-        x = F.relu(self.linear_layer_1(torch.cat([inputs["states"], inputs["taken_actions"]], dim=1)))
-        x = F.relu(self.linear_layer_2(x))
-        return self.linear_layer_3(x), {}
-
 
 # load and wrap the gymnasium environment.
 # note: the environment version may change depending on the gymnasium version
 env = gym.make("FrankaIkGolfCourseEnv-v0")
 env = wrap_env(env)
 
+goal_space = Box(low = -0.1, high= 0.1, shape=env.observation_space.shape, dtype= np.float32)
+goal_observed_space = Box(
+    low=np.concatenate([env.observation_space.low, goal_space.low]),
+    high=np.concatenate([env.observation_space.high, goal_space.high]),
+    dtype=np.float32
+)
+
 device = "cuda" if torch.cpu.is_available() else "cpu"
 
 # instantiate a memory as experience replay
-Highmemory = RandomMemory(memory_size=20000, num_envs=env.num_envs, device=device, replacement=False)
-Highsecondary_memory = RandomMemory(memory_size=3, num_envs=env.num_envs, device=device, replacement=False)
-Lowmemory = RandomMemory(memory_size=20000, num_envs=env.num_envs, device=device, replacement=False)
+high_level_memory = RandomMemory(memory_size=20000, num_envs=env.num_envs, device=device, replacement=False)
+high_level_secondary_memory = RandomMemory(memory_size=3, num_envs=env.num_envs, device=device, replacement=False)
+low_level_memory = RandomMemory(memory_size=20000, num_envs=env.num_envs, device=device, replacement=False)
+
 # instantiate the agent's models (function approximators).
-# SAC requires 5 models, visit its documentation for more details
 # https://skrl.readthedocs.io/en/latest/api/agents/sac.html#models
-models = {}
-models["policy"] = Actor(env.observation_space, env.action_space, device, clip_actions=True)
-models["critic_1"] = Critic(env.observation_space, env.action_space, device)
-models["critic_2"] = Critic(env.observation_space, env.action_space, device)
-models["target_critic_1"] = Critic(env.observation_space, env.action_space, device)
-models["target_critic_2"] = Critic(env.observation_space, env.action_space, device)
+high_level_models = {}
+high_level_models["policy"] = DeterministicActor(env.observation_space, env.observation_space, device)
+high_level_models["target_policy"] = DeterministicActor(env.observation_space, env.observation_space, device)
+high_level_models["critic"] = Critic(env.observation_space, env.observation_space, device)
+high_level_models["target_critic"] = Critic(env.observation_space, env.observation_space, device)
 
 # initialize models' parameters (weights and biases)
-for model in models.values():
+for model in high_level_models.values():
     model.init_parameters(method_name="normal_", mean=0.0, std=0.1)
 
+
+low_level_models = {}
+low_level_models["policy"] = DeterministicActor(goal_observed_space, env.action_space, device)
+low_level_models["target_policy"] = DeterministicActor(goal_observed_space, env.action_space, device)
+low_level_models["critic"] = Critic(goal_observed_space, env.action_space, device)
+low_level_models["target_critic"] = Critic(goal_observed_space, env.action_space, device)
+
+# initialize models' parameters (weights and biases)
+for model in low_level_models.values():
+    model.init_parameters(method_name="normal_", mean=0.0, std=0.1)
 
 # configure and instantiate the agent (visit its documentation to see all the options)
 # https://skrl.readthedocs.io/en/latest/api/agents/sac.html#configuration-and-hyperparameters
 cfg = HIRO_DEFAULT_CONFIG.copy()
-cfg["high_policy_sample_step"] = 0.98
-cfg["batch_size"] = 100
-cfg["random_timesteps"] = 0
-cfg["learning_starts"] = 1000
-cfg["learn_entropy"] = True
-# logging to TensorBoard and write checkpoints (in timesteps)
-cfg["experiment"]["write_interval"] = 75
-cfg["experiment"]["checkpoint_interval"] = 750
-cfg["experiment"]["directory"] = "runs/torch/Pendulum"
 
-agent = SAC(models=models,
-            memory=memory,
+cfg["high_policy_sample_step"] = 3
+
+agent = HIROAgent(high_models=high_level_models,
+            low_models= low_level_models,
+            high_memory= [high_level_memory, high_level_secondary_memory],
+            low_memory= low_level_memory,
             cfg=cfg,
             observation_space=env.observation_space,
+            goal_observed_space= goal_observed_space,
             action_space=env.action_space,
+            goal_action_space= goal_space,
             device=device)
-
 
 # configure and instantiate the RL trainer
 cfg_trainer = {"timesteps": 15000, "headless": True}
-trainer = SequentialTrainer(cfg=cfg_trainer, env=env, agents=[agent])
+trainer = HiroTrainer(cfg=cfg_trainer, env=env, agents=[agent])
 
 # start training
-trainer.train()
+trainer.single_agent_train()

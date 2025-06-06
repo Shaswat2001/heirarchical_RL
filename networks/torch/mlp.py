@@ -6,7 +6,7 @@ from skrl.models.torch import DeterministicMixin, GaussianMixin, Model
 class GaussianActor(GaussianMixin, Model):
     def __init__(self, observation_space, action_space, device, hidden_layers=[400, 300],
                  clip_actions=False, clip_log_std=True, min_log_std=-20, max_log_std=2, reduction="sum"):
-        super().__init__(observation_space, action_space, device)
+        Model.__init__(self, observation_space, action_space, device)
         GaussianMixin.__init__(self, clip_actions, clip_log_std, min_log_std, max_log_std, reduction)
 
         # Create MLP dynamically
@@ -27,7 +27,7 @@ class GaussianActor(GaussianMixin, Model):
     
 class DeterministicActor(DeterministicMixin, Model):
     def __init__(self, observation_space, action_space, device, hidden_layers=[400, 300], clip_actions=False):
-        super().__init__(observation_space, action_space, device)
+        Model.__init__(self, observation_space, action_space, device)
         DeterministicMixin.__init__(self, clip_actions)
 
         layers = []
@@ -46,7 +46,7 @@ class DeterministicActor(DeterministicMixin, Model):
 
 class Critic(DeterministicMixin, Model):
     def __init__(self, observation_space, action_space, device, hidden_layers=[400, 300], clip_actions=False):
-        super().__init__(observation_space, action_space, device)
+        Model.__init__(self, observation_space, action_space, device)
         DeterministicMixin.__init__(self, clip_actions)
 
         # Create MLP dynamically
