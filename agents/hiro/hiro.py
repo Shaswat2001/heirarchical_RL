@@ -178,7 +178,6 @@ class HighLevelDDPG(DDPG):
                k: int= 8):
         
         diff_goal = (next_state - state).reshape(-1, state.shape[0])
-
         original_goal = action[0,:]
         original_goal = original_goal.reshape(-1, original_goal.shape[0])
         random_goals = torch.normal(mean=diff_goal.expand(k,-1), std=.5*self.scale[None, :])
@@ -209,12 +208,11 @@ class HighLevelDDPG(DDPG):
             policy_actions[c] = low_level_policy.policy.act({"states": low_level_policy._state_preprocessor(combined_state)}, role="policy")[0]
 
         difference = (policy_actions - true_actions)
-        difference = np.where(difference != -np.inf, difference, 0)
-        difference = difference.reshape((ncands, seq_len, action_dim)).transpose(0, 1, 2)
+        difference = torch.where(difference != -torch.inf, difference, 0)
+        difference = difference.reshape((ncands, seq_len, action_dim))
 
-        logprob = -0.5*np.sum(np.linalg.norm(difference, axis=-1)**2, axis=-1)
-        max_indices = np.argmax(logprob, axis=-1)
-
+        logprob = -0.5*torch.sum(torch.norm(difference, dim=-1)**2, dim=-1)
+        max_indices = torch.argmax(logprob, dim=-1)
         return candidates[max_indices,:]
 
     
@@ -292,7 +290,7 @@ class HIROAgent:
         """
         
         
-        if timestep % self._high_policy_sample_step == 0:
+        if timestep % self._high_policy_sample_step == 0 or goals == None:
             goal, _, _ = self.high_agent.act(states = states,timestep= timestep, timesteps = timesteps)
         else:
             goal = goals

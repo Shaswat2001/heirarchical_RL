@@ -88,18 +88,17 @@ class HiroTrainer(Trainer):
 
             with torch.no_grad():
                 # compute actions
-                goals, actions, _, _ = self.agents.act(states, goals, timestep=timestep, timesteps=self.timesteps)
-
+                goal, actions, _, _ = self.agents.act(states, goals, timestep=timestep, timesteps=self.timesteps)
                 # step the environments
                 next_states, rewards, terminated, truncated, infos = self.env.step(actions)
-                next_goals = states + goals - next_states
+                next_goals = states + goal - next_states
                 low_agent_rewards = -torch.norm(next_goals).reshape(rewards.shape)
 
                 # render scene
                 if not self.headless:
                     self.env.render()
 
-                low_agent_states = torch.concat([states, goals], dim= -1)
+                low_agent_states = torch.concat([states, goal], dim= -1)
                 low_agent_next_states = torch.concat([next_states, next_goals], dim= -1)
                 # record the environments' transitions
                 self.agents.record_low_transition(
@@ -116,7 +115,7 @@ class HiroTrainer(Trainer):
 
                 self.agents.record_high_transition(
                     states=states,
-                    goals=goals,
+                    goals=goal,
                     actions=actions,
                     rewards=rewards,
                     next_states=next_states,

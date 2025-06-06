@@ -80,7 +80,7 @@ agent = HIROAgent(high_models=high_level_models,
             device=device)
 
 # configure and instantiate the RL trainer
-cfg_trainer = {"timesteps": 15000, "headless": True}
+cfg_trainer = {"timesteps": 1500000, "headless": True}
 trainer = HiroTrainer(cfg=cfg_trainer, env=env, agents=[agent])
 
 # start training
