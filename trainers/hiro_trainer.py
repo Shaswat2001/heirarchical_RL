@@ -79,16 +79,16 @@ class HiroTrainer(Trainer):
         states, infos = self.env.reset()
         goals = None
 
+        current_timestep = 0
         for timestep in tqdm.tqdm(
             range(self.initial_timestep, self.timesteps), disable=self.disable_progressbar, file=sys.stdout
         ):
-
             # pre-interaction
             self.agents.pre_interaction(timestep=timestep, timesteps=self.timesteps)
 
             with torch.no_grad():
                 # compute actions
-                goal, actions, _, _ = self.agents.act(states, goals, timestep=timestep, timesteps=self.timesteps)
+                goal, actions, _, _ = self.agents.act(states, goals, timestep=current_timestep, timesteps=self.timesteps)
                 # step the environments
                 next_states, rewards, terminated, truncated, infos = self.env.step(actions)
                 next_goals = states + goal - next_states
@@ -134,7 +134,7 @@ class HiroTrainer(Trainer):
 
             # post-interaction
             self.agents.post_interaction(timestep=timestep, timesteps=self.timesteps)
-
+            current_timestep += 1
             # reset environments
             if self.env.num_envs > 1:
                 states = next_states
@@ -144,6 +144,7 @@ class HiroTrainer(Trainer):
                     with torch.no_grad():
                         states, infos = self.env.reset()
                         goals = None
+                        current_timestep = 0
                 else:
                     states = next_states
                     goals = next_goals

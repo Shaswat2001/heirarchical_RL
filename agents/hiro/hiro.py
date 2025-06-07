@@ -16,6 +16,19 @@ from skrl.agents.torch.base import Agent
 from skrl.memories.torch import Memory
 from skrl.models.torch import Model
 
+HIGH_LEVEL_DEFAULT_CONFIG = {
+
+    "experiment": {
+
+        "write_interval": 100000,
+        "checkpoint_interval": 100000,      # interval for checkpoints (timesteps)
+        "store_separately": True,          # whether to store checkpoints separately
+
+        "wandb": False,             # whether to use Weights & Biases
+        "wandb_kwargs": {}          # wandb kwargs (see https://docs.wandb.ai/ref/python/init)
+    }
+}
+
 HIRO_DEFAULT_CONFIG = {
     "high_policy_sample_step": 1,
 }
@@ -33,7 +46,7 @@ class HighLevelDDPG(DDPG):
         cfg: Optional[dict] = None,
     ) -> None:
         
-        _cfg = {}
+        _cfg = copy.deepcopy(HIGH_LEVEL_DEFAULT_CONFIG)
         _cfg.update(cfg if cfg is not None else {})
 
         super().__init__(
@@ -213,6 +226,7 @@ class HighLevelDDPG(DDPG):
 
         logprob = -0.5*torch.sum(torch.norm(difference, dim=-1)**2, dim=-1)
         max_indices = torch.argmax(logprob, dim=-1)
+
         return candidates[max_indices,:]
 
     
@@ -231,12 +245,43 @@ class HighLevelDDPG(DDPG):
         corrected_next_states = next_states[-1,:]
         currected_terminated = terminated[-1,:]
         currected_truncated = truncated[-1,:]
-        corrected_rewards = torch.sum(rewards)
+        corrected_rewards = 0.1*torch.sum(rewards)
 
         corrected_goal = self.sample(corrected_states, corrected_next_states, goals, states, actions, low_level_policy)
 
         return corrected_states, corrected_goal, corrected_rewards, corrected_next_states, currected_terminated, currected_truncated 
 
+    def post_interaction(self, timestep: int, timesteps: int) -> None:
+        """Callback called after the interaction with the environment
+
+        :param timestep: Current timestep
+        :type timestep: int
+        :param timesteps: Number of timesteps
+        :type timesteps: int
+        """
+        if timestep >= self._learning_starts:
+            self.set_mode("train")
+            self._update(timestep, timesteps)
+            self.set_mode("eval")
+        
+        timestep += 1
+        # update best models and write checkpoints
+        if timestep > 1 and self.checkpoint_interval > 0 and not (timestep-1) % self.checkpoint_interval:
+            # update best models
+            reward = np.mean(self.tracking_data.get("Reward / Total reward (mean)", -(2**31)))
+            if reward > self.checkpoint_best_modules["reward"]:
+                self.checkpoint_best_modules["timestep"] = timestep
+                self.checkpoint_best_modules["reward"] = reward
+                self.checkpoint_best_modules["saved"] = False
+                self.checkpoint_best_modules["modules"] = {
+                    k: copy.deepcopy(self._get_internal_value(v)) for k, v in self.checkpoint_modules.items()
+                }
+            # write checkpoints
+            self.write_checkpoint(timestep, timesteps)
+
+        # write to tensorboard
+        if timestep > 1 and self.write_interval > 0 and not (timestep-1) % self.write_interval:
+            self.write_tracking_data(timestep, timesteps)
 class HIROAgent:
 
     def __init__(
@@ -290,7 +335,7 @@ class HIROAgent:
         """
         
         
-        if timestep % self._high_policy_sample_step == 0 or goals == None:
+        if timestep % self._high_policy_sample_step == 0:
             goal, _, _ = self.high_agent.act(states = states,timestep= timestep, timesteps = timesteps)
         else:
             goal = goals
@@ -368,6 +413,7 @@ class HIROAgent:
     def post_interaction(self, timestep: int, timesteps: int):
 
         if timestep % self._high_policy_sample_step == 0 and self.high_agent.memory.memory_index > 0:
+            print("Saving Data")
             self.high_agent.post_interaction(timestep= timestep, timesteps= timesteps)
         
         self.low_agent.post_interaction(timestep= timestep, timesteps= timesteps)

@@ -22,10 +22,10 @@ set_seed()  # e.g. `set_seed(42)` for fixed seed
 
 # load and wrap the gymnasium environment.
 # note: the environment version may change depending on the gymnasium version
-env = gym.make("FrankaIkGolfCourseEnv-v0", keyframe = "init_frame")
+env = gym.make("FrankaIkGolfCourseEnv-v0")
 env = wrap_env(env)
 
-goal_space = Box(low = -1.0, high= 1.0, shape=env.observation_space.shape, dtype= np.float32)
+goal_space = Box(low = -0.1, high= 0.1, shape=env.observation_space.shape, dtype= np.float32)
 goal_observed_space = Box(
     low=np.concatenate([env.observation_space.low, goal_space.low]),
     high=np.concatenate([env.observation_space.high, goal_space.high]),
@@ -81,6 +81,7 @@ agent = HIROAgent(high_models=high_level_models,
 
 # configure and instantiate the RL trainer
 cfg_trainer = {"timesteps": 1500000, "headless": True}
+
 trainer = HiroTrainer(cfg=cfg_trainer, env=env, agents=[agent])
 
 # start training
