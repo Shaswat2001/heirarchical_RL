@@ -1,8 +1,10 @@
 
 import jax
 import flax
-import copy
+import optax
 
+import copy
+import functools
 from utils.networks import GCActor
 from utils.flax_utils import ModuleDict, TrainState, nonpytree_field
 
@@ -49,16 +51,15 @@ class GCBCAgent(flax.struct.PyTreeNode):
         )
 
         network_info = dict(
-            actor=(actor_def, (ex_observations, ex_observations)),
+            actor=(actor_def, (ex_observations, ex_observations))
         )
-        networks = {k: v[0] for k, v in network_info.items()}
-        network_args = {k: v[1] for k, v in network_info.items()}
 
-        network_def = ModuleDict(networks)
-        network_tx = optax.adam(learning_rate=config['lr'])
+        network = {k: v[0] for k,v in network_info.items()}
+        network_args = {k: v[1] for k,v in network_info.items()}
+
+        network_def = ModuleDict(network)
+        network_tx = optax.adam(learning_rate=_cfg['lr'])
         network_params = network_def.init(init_rng, **network_args)['params']
         network = TrainState.create(network_def, network_params, tx=network_tx)
 
-        return cls(rng, network=network, config=flax.core.FrozenDict(**config))
-
-
+        return cls(rng, network=network, config=flax.core.FrozenDict(**_cfg))
