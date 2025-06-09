@@ -1,4 +1,5 @@
 import numpy as np
+import dataclasses
 from typing import Any
 
 import jax 
@@ -14,7 +15,7 @@ class Dataset(FrozenDict):
     def create(cls, freeze=True, **fields):
 
         data = fields
-        assert "observation" in data
+        assert "observations" in data
         if freeze:
             jax.tree.map(lambda field: field.setflags(write=False), data) # sets the array to become immutable
 
@@ -43,6 +44,7 @@ class Dataset(FrozenDict):
             result['next_observations'] = self._dict['observations'][np.minimum(idxs + 1, self.size - 1)]
         return result
     
+@dataclasses.dataclass
 class GCDataset:
 
     dataset: Dataset
@@ -52,7 +54,7 @@ class GCDataset:
 
         self.size = self.dataset.size
 
-        self.where_terminate = np.nonzero(self.dataset["terminated"] > 0)
+        (self.where_terminate, ) = np.nonzero(self.dataset["terminals"] > 0)
 
         assert self.where_terminate[-1] == self.size - 1
 

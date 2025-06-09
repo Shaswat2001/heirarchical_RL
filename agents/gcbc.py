@@ -37,8 +37,9 @@ class GCBCAgent(flax.struct.PyTreeNode):
     network: Any
     config: Any = nonpytree_field()
 
+    @jax.jit
     def actor_loss(self, batch, grad_params, rng=None):
-        """Compute the BC actor loss."""
+
         dist = self.network.select('actor')(batch['observations'], batch['actor_goals'], params=grad_params)
         log_prob = dist.log_prob(batch['actions'])
 
@@ -48,7 +49,7 @@ class GCBCAgent(flax.struct.PyTreeNode):
             'actor_loss': actor_loss,
             'bc_log_prob': log_prob.mean(),
         }
-        
+
         actor_info.update(
             {
                 'mse': jnp.mean((dist.mode() - batch['actions']) ** 2),
@@ -60,7 +61,7 @@ class GCBCAgent(flax.struct.PyTreeNode):
 
     @jax.jit
     def total_loss(self, batch, grad_params, rng=None):
-        """Compute the total loss."""
+
         info = {}
         rng = rng if rng is not None else self.rng
 
@@ -74,7 +75,7 @@ class GCBCAgent(flax.struct.PyTreeNode):
 
     @jax.jit
     def update(self, batch):
-        """Update the agent and return a new agent with information dictionary."""
+
         new_rng, rng = jax.random.split(self.rng)
 
         def loss_fn(grad_params):
@@ -84,13 +85,12 @@ class GCBCAgent(flax.struct.PyTreeNode):
 
         return self.replace(network=new_network, rng=new_rng), info
 
+    def get_actions(self, observation, goal= None, seed= None, temperature= 1.0):
 
-    def get_action(self, observations, goal= None, seed= None, temperature= 1.0):
+        dist = self.network.select('actor')(observation, goal, temperature=temperature)
+        actions = dist.sample(seed= seed)
+        actions = jnp.clip(actions, -1.0, 1.0)
 
-        dist = self.network.select('actor')(observations, goal, temperature=temperature)
-        actions = dist.sample(seed=seed)
-        if not self.config['discrete']:
-            actions = jnp.clip(actions, -1, 1)
         return actions
 
     @classmethod
@@ -106,10 +106,8 @@ class GCBCAgent(flax.struct.PyTreeNode):
         action_dim = ex_actions.shape[-1]
 
         actor_def = GCActor(
-            hidden_dims=_cfg['actor_hidden_dims'],
+            hidden_layers=_cfg['actor_hidden_dims'],
             action_dim=action_dim,
-            state_dependent_std=False,
-            const_std=_cfg['const_std'],
         )
 
         network_info = dict(

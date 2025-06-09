@@ -35,9 +35,8 @@ def setup_wandb(
     tags = [group] if group is not None else None
 
     init_kwargs = dict(
-        config=get_flag_dict(),
         project=project,
-        entity=entity,
+        entity=entity,  
         tags=tags,
         group=group,
         dir=wandb_output_dir,

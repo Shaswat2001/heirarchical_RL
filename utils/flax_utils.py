@@ -1,5 +1,7 @@
 
 import functools
+import pickle
+import os
 from typing import Any, Dict, Mapping, Sequence
 
 import jax
@@ -153,3 +155,21 @@ class TrainState(flax.struct.PyTreeNode):
         )
 
         return self.apply_gradients(grads=grads), info
+    
+def save_agent(agent, save_dir, epoch):
+    """Save the agent to a file.
+
+    Args:
+        agent: Agent.
+        save_dir: Directory to save the agent.
+        epoch: Epoch number.
+    """
+
+    save_dict = dict(
+        agent=flax.serialization.to_state_dict(agent),
+    )
+    save_path = os.path.join(save_dir, f'params_{epoch}.pkl')
+    with open(save_path, 'wb') as f:
+        pickle.dump(save_dict, f)
+
+    print(f'Saved to {save_path}')

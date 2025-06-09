@@ -12,7 +12,7 @@ def default_init(scale=1.0):
 class MLP(nn.Module):
 
     hidden_layers: Sequence[int]
-    activation: nn.gelu
+    activation: Any = nn.gelu
     activate_final: bool = False
     kernel_init: Any = default_init()
     layer_norm: bool = False
