@@ -11,11 +11,21 @@ from collections import defaultdict
 from agents import agents
 
 import jax
+import jax.numpy as jnp
 from utils.buffers import GCDataset, Dataset
 from utils.env_utils import make_env_and_datasets
 from utils.logging import get_exp_name, setup_wandb, get_wandb_video
 from utils.evaluation import *
 from utils.flax_utils import save_agent
+
+def sanitize_metrics(metrics):
+    sanitized = {}
+    for k, v in metrics.items():
+        if isinstance(v, (jnp.ndarray, float, int)):
+            sanitized[k] = float(v)
+        else:
+            sanitized[k] = v
+    return sanitized
 
 def main(args):
 
@@ -59,7 +69,7 @@ def main(args):
             train_metrics['time/epoch_time'] = (time.time() - last_time) / args.log_interval
             train_metrics['time/total_time'] = time.time() - first_time
             last_time = time.time()
-            wandb.log(train_metrics, step=i)
+            wandb.log(sanitize_metrics(train_metrics), step=i)
 
         # Evaluate agent.
         if i == 1 or i % args.eval_interval == 0:
@@ -100,7 +110,7 @@ def main(args):
                 video = get_wandb_video(renders=renders, n_cols=num_tasks)
                 eval_metrics['video'] = video
 
-            wandb.log(eval_metrics, step=i)
+            wandb.log(sanitize_metrics(eval_metrics), step=i)
 
         # Save agent.
         if i % args.save_interval == 0:
