@@ -18,6 +18,8 @@ def main(args):
     with open(os.path.join(args.save_dir, 'flags.json'), 'w') as f:
         json.dump(flag_dict, f)
 
+        
+
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()

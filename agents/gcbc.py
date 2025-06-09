@@ -2,10 +2,12 @@
 import jax
 import flax
 import optax
+import jax.numpy as jnp
 
 import copy
 import functools
 from utils.networks import GCActor
+from typing import Any
 from utils.flax_utils import ModuleDict, TrainState, nonpytree_field
 
 GCBC_CONFIG_DICT = {
@@ -30,6 +32,66 @@ GCBC_CONFIG_DICT = {
 }
 
 class GCBCAgent(flax.struct.PyTreeNode):
+
+    rng: Any
+    network: Any
+    config: Any = nonpytree_field()
+
+    def actor_loss(self, batch, grad_params, rng=None):
+        """Compute the BC actor loss."""
+        dist = self.network.select('actor')(batch['observations'], batch['actor_goals'], params=grad_params)
+        log_prob = dist.log_prob(batch['actions'])
+
+        actor_loss = -log_prob.mean()
+
+        actor_info = {
+            'actor_loss': actor_loss,
+            'bc_log_prob': log_prob.mean(),
+        }
+        
+        actor_info.update(
+            {
+                'mse': jnp.mean((dist.mode() - batch['actions']) ** 2),
+                'std': jnp.mean(dist.scale_diag),
+            }
+        )
+
+        return actor_loss, actor_info
+
+    @jax.jit
+    def total_loss(self, batch, grad_params, rng=None):
+        """Compute the total loss."""
+        info = {}
+        rng = rng if rng is not None else self.rng
+
+        rng, actor_rng = jax.random.split(rng)
+        actor_loss, actor_info = self.actor_loss(batch, grad_params, actor_rng)
+        for k, v in actor_info.items():
+            info[f'actor/{k}'] = v
+
+        loss = actor_loss
+        return loss, info
+
+    @jax.jit
+    def update(self, batch):
+        """Update the agent and return a new agent with information dictionary."""
+        new_rng, rng = jax.random.split(self.rng)
+
+        def loss_fn(grad_params):
+            return self.total_loss(batch, grad_params, rng=rng)
+
+        new_network, info = self.network.apply_loss_fn(loss_fn=loss_fn)
+
+        return self.replace(network=new_network, rng=new_rng), info
+
+
+    def get_action(self, observations, goal= None, seed= None, temperature= 1.0):
+
+        dist = self.network.select('actor')(observations, goal, temperature=temperature)
+        actions = dist.sample(seed=seed)
+        if not self.config['discrete']:
+            actions = jnp.clip(actions, -1, 1)
+        return actions
 
     @classmethod
     def create(cls, seed, ex_observations, ex_actions, cfg):
