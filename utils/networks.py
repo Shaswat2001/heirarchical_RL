@@ -1,12 +1,15 @@
+
+import distrax
+import jax.numpy as jnp
 import flax.linen as nn
 
-from typing import Any, Sequence
+from typing import Any, Sequence, Optional
 
 def default_init(scale=1.0):
     """Default kernel initializer."""
     return nn.initializers.variance_scaling(scale, 'fan_avg', 'uniform')
 
-class MLP:
+class MLP(nn.Module):
 
     hidden_layers: Sequence[int]
     activation: nn.gelu
@@ -26,3 +29,33 @@ class MLP:
             if i == len(self.hidden_layers) - 2:
                 self.sow('intermediates', 'feature', x)
         return x
+    
+class GCActor(nn.Module):
+
+    hidden_layers: Sequence[int]
+    action_dim: int
+    final_fc_init_scale: float = 1e-2
+    log_std_min: Optional[float] = -5
+    log_std_max: Optional[float] = 2
+
+    def setup(self):
+        
+        self.actor_net = MLP(self.hidden_layers, activate_final= True)
+        self.mean_net = nn.Dense(self.action_dim, kernel_init=default_init(self.final_fc_init_scale))
+
+        self.log_std_net = nn.Dense(self.action_dim, kernel_init=default_init(self.final_fc_init_scale))
+    
+    def __call__(self, observations, goal = None, temperature = 1.0):
+        
+        inputs = [observations]
+        if goal is not None:
+            inputs.append(goal)
+        inputs = jnp.concatenate(inputs, axis=-1)
+        outputs = self.actor_net(inputs)
+
+        means = self.mean_net(outputs)
+        log_stds = self.log_std_net(outputs)
+        log_stds = jnp.clip(log_stds, self.log_std_min, self.log_std_max)
+
+        distribution = distrax.MultivariateNormalDiag(loc=means, scale_diag=jnp.exp(log_stds) * temperature)
+        return distribution
