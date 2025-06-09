@@ -1,4 +1,6 @@
 /runs/
 /networks/torch/__pycache__
-/agents/hiro/__pycache__
+/agents/__pycache__
+/utils/__pycache__
 /trainers/__pycache__
+/exp/
