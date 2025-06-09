@@ -13,7 +13,8 @@ from agents import agents
 import jax
 from utils.buffers import GCDataset, Dataset
 from utils.env_utils import make_env_and_datasets
-from utils.logging import get_exp_name, setup_wandb
+from utils.logging import get_exp_name, setup_wandb, get_wandb_video
+from utils.evaluation import *
 from utils.flax_utils import save_agent
 
 def main(args):
@@ -60,47 +61,46 @@ def main(args):
             last_time = time.time()
             wandb.log(train_metrics, step=i)
 
-        # # Evaluate agent.
-        # if i == 1 or i % args.eval_interval == 0:
-        #     if args.eval_on_cpu:
-        #         eval_agent = jax.device_put(agent, device=jax.devices('cpu')[0])
-        #     else:
-        #         eval_agent = agent
-        #     renders = []
-        #     eval_metrics = {}
-        #     overall_metrics = defaultdict(list)
-        #     task_infos = env.unwrapped.task_infos if hasattr(env.unwrapped, 'task_infos') else env.task_infos
-        #     num_tasks = args.eval_tasks if args.eval_tasks is not None else len(task_infos)
-            # for task_id in tqdm.trange(1, num_tasks + 1):
-            #     task_name = task_infos[task_id - 1]['task_name']
-            #     eval_info, trajs, cur_renders = evaluate(
-            #         agent=eval_agent,
-            #         env=env,
-            #         task_id=task_id,
-            #         config=config,
-            #         num_eval_episodes=FLAGS.eval_episodes,
-            #         num_video_episodes=FLAGS.video_episodes,
-            #         video_frame_skip=FLAGS.video_frame_skip,
-            #         eval_temperature=FLAGS.eval_temperature,
-            #         eval_gaussian=FLAGS.eval_gaussian,
-            #     )
-            #     renders.extend(cur_renders)
-            #     metric_names = ['success']
-            #     eval_metrics.update(
-            #         {f'evaluation/{task_name}_{k}': v for k, v in eval_info.items() if k in metric_names}
-            #     )
-            #     for k, v in eval_info.items():
-            #         if k in metric_names:
-            #             overall_metrics[k].append(v)
-            # for k, v in overall_metrics.items():
-            #     eval_metrics[f'evaluation/overall_{k}'] = np.mean(v)
+        # Evaluate agent.
+        if i == 1 or i % args.eval_interval == 0:
+            if args.eval_on_cpu:
+                eval_agent = jax.device_put(agent, device=jax.devices('cpu')[0])
+            else:
+                eval_agent = agent
+            renders = []
+            eval_metrics = {}
+            overall_metrics = defaultdict(list)
+            task_infos = env.unwrapped.task_infos if hasattr(env.unwrapped, 'task_infos') else env.task_infos
+            num_tasks = args.eval_tasks if args.eval_tasks is not None else len(task_infos)
+            for task_id in tqdm.trange(1, num_tasks + 1):
+                task_name = task_infos[task_id - 1]['task_name']
+                eval_info, trajs, cur_renders = evaluate(
+                    agent=eval_agent,
+                    env=env,
+                    task_id=task_id,
+                    config=agent_config,
+                    num_eval_episodes=args.eval_episodes,
+                    num_video_episodes=args.video_episodes,
+                    video_frame_skip=args.video_frame_skip,
+                    eval_temperature=args.eval_temperature,
+                    eval_gaussian=args.eval_gaussian,
+                )
+                renders.extend(cur_renders)
+                metric_names = ['success']
+                eval_metrics.update(
+                    {f'evaluation/{task_name}_{k}': v for k, v in eval_info.items() if k in metric_names}
+                )
+                for k, v in eval_info.items():
+                    if k in metric_names:
+                        overall_metrics[k].append(v)
+            for k, v in overall_metrics.items():
+                eval_metrics[f'evaluation/overall_{k}'] = np.mean(v)
 
-            # if FLAGS.video_episodes > 0:
-            #     video = get_wandb_video(renders=renders, n_cols=num_tasks)
-            #     eval_metrics['video'] = video
+            if args.video_episodes > 0:
+                video = get_wandb_video(renders=renders, n_cols=num_tasks)
+                eval_metrics['video'] = video
 
-            # wandb.log(eval_metrics, step=i)
-            # eval_logger.log(eval_metrics, step=i)
+            wandb.log(eval_metrics, step=i)
 
         # Save agent.
         if i % args.save_interval == 0:
@@ -138,7 +138,8 @@ if __name__ == "__main__":
     parser.add_argument('--eval_gaussian', type=float, default=None, help='Action Gaussian noise for evaluation.')
     parser.add_argument('--eval_tasks', type=float, default=None, help='Number of tasks to evaluate (None for all).')
     parser.add_argument('--eval_on_cpu', type=float, default=1.0, help='Whether to evaluate on CPU.')
-
+    parser.add_argument('--video_episodes', type=int, default=1, help='Number of video episodes for each task.')
+    parser.add_argument('--video_frame_skip', type=int, default=3, help='Frame skip for videos.')
     args = parser.parse_args()
 
     main(args)
