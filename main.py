@@ -72,45 +72,45 @@ def main(args):
             wandb.log(sanitize_metrics(train_metrics), step=i)
 
         # Evaluate agent.
-        if i == 1 or i % args.eval_interval == 0:
-            if args.eval_on_cpu:
-                eval_agent = jax.device_put(agent, device=jax.devices('cpu')[0])
-            else:
-                eval_agent = agent
-            renders = []
-            eval_metrics = {}
-            overall_metrics = defaultdict(list)
-            task_infos = env.unwrapped.task_infos if hasattr(env.unwrapped, 'task_infos') else env.task_infos
-            num_tasks = args.eval_tasks if args.eval_tasks is not None else len(task_infos)
-            for task_id in tqdm.trange(1, num_tasks + 1):
-                task_name = task_infos[task_id - 1]['task_name']
-                eval_info, trajs, cur_renders = evaluate(
-                    agent=eval_agent,
-                    env=env,
-                    task_id=task_id,
-                    config=agent_config,
-                    num_eval_episodes=args.eval_episodes,
-                    num_video_episodes=args.video_episodes,
-                    video_frame_skip=args.video_frame_skip,
-                    eval_temperature=args.eval_temperature,
-                    eval_gaussian=args.eval_gaussian,
-                )
-                renders.extend(cur_renders)
-                metric_names = ['success']
-                eval_metrics.update(
-                    {f'evaluation/{task_name}_{k}': v for k, v in eval_info.items() if k in metric_names}
-                )
-                for k, v in eval_info.items():
-                    if k in metric_names:
-                        overall_metrics[k].append(v)
-            for k, v in overall_metrics.items():
-                eval_metrics[f'evaluation/overall_{k}'] = np.mean(v)
+        # if i == 1 or i % args.eval_interval == 0:
+        #     if args.eval_on_cpu:
+        #         eval_agent = jax.device_put(agent, device=jax.devices('cpu')[0])
+        #     else:
+        #         eval_agent = agent
+        #     renders = []
+        #     eval_metrics = {}
+        #     overall_metrics = defaultdict(list)
+        #     task_infos = env.unwrapped.task_infos if hasattr(env.unwrapped, 'task_infos') else env.task_infos
+        #     num_tasks = args.eval_tasks if args.eval_tasks is not None else len(task_infos)
+        #     for task_id in tqdm.trange(1, num_tasks + 1):
+        #         task_name = task_infos[task_id - 1]['task_name']
+        #         eval_info, trajs, cur_renders = evaluate(
+        #             agent=eval_agent,
+        #             env=env,
+        #             task_id=task_id,
+        #             config=agent_config,
+        #             num_eval_episodes=args.eval_episodes,
+        #             num_video_episodes=args.video_episodes,
+        #             video_frame_skip=args.video_frame_skip,
+        #             eval_temperature=args.eval_temperature,
+        #             eval_gaussian=args.eval_gaussian,
+        #         )
+        #         renders.extend(cur_renders)
+        #         metric_names = ['success']
+        #         eval_metrics.update(
+        #             {f'evaluation/{task_name}_{k}': v for k, v in eval_info.items() if k in metric_names}
+        #         )
+        #         for k, v in eval_info.items():
+        #             if k in metric_names:
+        #                 overall_metrics[k].append(v)
+        #     for k, v in overall_metrics.items():
+        #         eval_metrics[f'evaluation/overall_{k}'] = np.mean(v)
 
-            if args.video_episodes > 0:
-                video = get_wandb_video(renders=renders, n_cols=num_tasks)
-                eval_metrics['video'] = video
+        #     if args.video_episodes > 0:
+        #         video = get_wandb_video(renders=renders, n_cols=num_tasks)
+        #         eval_metrics['video'] = video
 
-            wandb.log(sanitize_metrics(eval_metrics), step=i)
+        #     wandb.log(sanitize_metrics(eval_metrics), step=i)
 
         # Save agent.
         if i % args.save_interval == 0:
@@ -123,7 +123,7 @@ if __name__ == "__main__":
 
     parser.add_argument('--run_group', type=str, default='Debug', help='Run group.')
     parser.add_argument('--seed', type=int, default=0, help='Random seed.')
-    parser.add_argument('--agents', type=str, default="gcbc", help='Agent to load.')
+    parser.add_argument('--agents', type=str, default="gciql", help='Agent to load.')
 
     # Environment
     parser.add_argument('--env_name', type=str, default='antmaze-medium-navigate-v0', help='Environment (dataset) name.')

@@ -70,7 +70,7 @@ class GCIQLAgent(flax.struct.PyTreeNode):
         q = self.network.select("critic")(batch["observations"], batch["value_goals"], batch["actions"], params= grad_params)
         target_v = self.network.select("value")(batch["observations"], batch["value_goals"], params= grad_params)
 
-        target_q = batch["rewards"] + self.config["gamma"]*batch["masks"]*target_v
+        target_q = batch["rewards"] + self.config["discount"]*batch["masks"]*target_v
 
         critic_loss = ((target_q - q)**2).mean()
 
