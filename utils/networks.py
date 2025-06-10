@@ -59,3 +59,25 @@ class GCActor(nn.Module):
 
         distribution = distrax.MultivariateNormalDiag(loc=means, scale_diag=jnp.exp(log_stds) * temperature)
         return distribution
+    
+class GCValue(nn.Module):
+
+    hidden_layers: Sequence[int]
+    layer_norm: bool = True
+
+    def setup(self):
+
+        self.value_net = MLP((*self.hidden_layers,1), activate_final=False, layer_norm=self.layer_norm)
+    
+    def __call__(self, observations, goals = None, actions = None):
+        
+        inputs = [observations]
+        if goals is not None:
+            inputs.append(goals)
+        
+        if actions is not None:
+            inputs.append(actions)
+        
+        inputs = jnp.concatenate(inputs, axis = -1)
+        value_output = self.value_net(inputs)
+        return value_output
