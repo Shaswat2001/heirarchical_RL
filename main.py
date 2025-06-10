@@ -12,7 +12,7 @@ from agents import agents
 
 import jax
 import jax.numpy as jnp
-from utils.buffers import GCDataset, Dataset
+from utils.buffers import buffers, Dataset
 from utils.env_utils import make_env_and_datasets
 from utils.logging import get_exp_name, setup_wandb, get_wandb_video
 from utils.evaluation import *
@@ -41,8 +41,9 @@ def main(args):
 
     (agent_class, agent_config) = agents[args.agents]
 
-    train_dataset = GCDataset(Dataset.create(**train_dataset),agent_config)
-    val_dataset = GCDataset(Dataset.create(**val_dataset),agent_config)
+    buffer_class = buffers[agent_config["dataset_class"]]
+    train_dataset = buffer_class(Dataset.create(**train_dataset),agent_config)
+    val_dataset = buffer_class(Dataset.create(**val_dataset),agent_config)
     example_batch = train_dataset.sample(1)
 
     agent = agent_class.create(
@@ -123,7 +124,7 @@ if __name__ == "__main__":
 
     parser.add_argument('--run_group', type=str, default='Debug', help='Run group.')
     parser.add_argument('--seed', type=int, default=0, help='Random seed.')
-    parser.add_argument('--agents', type=str, default="gciql", help='Agent to load.')
+    parser.add_argument('--agents', type=str, default="hiql", help='Agent to load.')
 
     # Environment
     parser.add_argument('--env_name', type=str, default='antmaze-medium-navigate-v0', help='Environment (dataset) name.')
