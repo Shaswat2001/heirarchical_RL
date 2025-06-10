@@ -126,7 +126,7 @@ if __name__ == "__main__":
     parser.add_argument('--agents', type=str, default="gcbc", help='Agent to load.')
 
     # Environment
-    parser.add_argument('--env_name', type=str, default='humanoidmaze-medium-navigate-v0', help='Environment (dataset) name.')
+    parser.add_argument('--env_name', type=str, default='antmaze-medium-navigate-v0', help='Environment (dataset) name.')
     parser.add_argument('--dataset_dir', type=str, default="~/.ogbench/data", help='Dataset directory.')
     parser.add_argument('--dataset_replace_interval', type=int, default=1000, help='Dataset replace interval.')
     parser.add_argument('--num_datasets', type=int, default=None, help='Number of datasets to use.')
@@ -140,10 +140,10 @@ if __name__ == "__main__":
     parser.add_argument('--offline_steps', type=int, default=5000000, help='Number of offline steps.')
     parser.add_argument('--log_interval', type=int, default=10000, help='Logging interval.')
     parser.add_argument('--eval_interval', type=int, default=250000, help='Evaluation interval.')
-    parser.add_argument('--save_interval', type=int, default=5000000, help='Saving interval.')
+    parser.add_argument('--save_interval', type=int, default=1000000, help='Saving interval.')
 
     # Evaluation
-    parser.add_argument('--eval_episodes', type=int, default=2, help='Number of episodes for each task.')
+    parser.add_argument('--eval_episodes', type=int, default=50, help='Number of episodes for each task.')
     parser.add_argument('--eval_temperature', type=float, default=0, help='Actor temperature for evaluation.')
     parser.add_argument('--eval_gaussian', type=float, default=None, help='Action Gaussian noise for evaluation.')
     parser.add_argument('--eval_tasks', type=float, default=None, help='Number of tasks to evaluate (None for all).')

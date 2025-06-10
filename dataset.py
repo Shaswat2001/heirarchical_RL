@@ -1,7 +1,7 @@
 import ogbench
 
 dataset_names = [
-    'humanoidmaze-medium-navigate-v0',
+    'antmaze-medium-diverse-v0',
 ]
 ogbench.download_datasets(
     dataset_names,  # List of dataset names.
