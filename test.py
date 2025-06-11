@@ -54,5 +54,8 @@ for key in data.files:
     print(f"{key}: shape = {data[key].shape}, dtype = {data[key].dtype}")
     print(data[key])  # Print actual data if needed
 
-for i in data["actions"]:
+for i in data["observations"]:
     print(i)
+
+import numpy as np
+

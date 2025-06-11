@@ -115,3 +115,90 @@ def evaluate(
         stats[k] = np.mean(v)
 
     return stats, trajs, renders
+
+def evaluate_sai(
+    agent,
+    env,
+    config=None,
+    num_eval_episodes=50,
+    num_video_episodes=0,
+    video_frame_skip=3,
+    eval_temperature=0,
+    eval_gaussian=None,
+):
+    """Evaluate the agent in the environment.
+
+    Args:
+        agent: Agent.
+        env: Environment.
+        task_id: Task ID to be passed to the environment.
+        config: Configuration dictionary.
+        num_eval_episodes: Number of episodes to evaluate the agent.
+        num_video_episodes: Number of episodes to render. These episodes are not included in the statistics.
+        video_frame_skip: Number of frames to skip between renders.
+        eval_temperature: Action sampling temperature.
+        eval_gaussian: Standard deviation of the Gaussian noise to add to the actions.
+
+    Returns:
+        A tuple containing the statistics, trajectories, and rendered videos.
+    """
+    actor_fn = supply_rng(agent.get_actions, rng=jax.random.PRNGKey(np.random.randint(0, 2**32)))
+    trajs = []
+    stats = defaultdict(list)
+
+    renders = []
+    for i in trange(num_eval_episodes + num_video_episodes):
+        traj = defaultdict(list)
+        should_render = i >= num_eval_episodes
+
+        observation, info = env.reset()
+        data_str = """
+        5.2901417e-01  7.7292925e-01  2.0322290e-01 -1.6966331e+00
+        2.1188314e+00  1.9888296e+00 -1.8227720e+00  9.9988272e-03
+        9.9982079e-03 -5.0462088e-08  1.5995282e-09 -1.7151105e-07
+        2.2123430e-07  3.6067107e-08  1.2647618e-07 -3.1669245e-07
+        9.3663971e-07  5.0173782e-07 -6.2188178e-01 -3.2543231e-02
+        3.9842088e-02 -6.8669999e-01  0.0000000e+00  2.5000000e-02
+        3.1797579e-01 -1.3466152e-02  1.4644498e-01  6.9714880e-01
+        -2.9248243e-02  8.6625637e-03  7.1627724e-01
+        """
+
+        goal = np.fromstring(data_str, sep=' ')
+        # goal = info.get('goal')
+        # goal_frame = info.get('goal_rendered')
+        done = False
+        step = 0
+        while not done:
+            action = actor_fn(observation=observation, goal=goal, temperature=eval_temperature)
+            action = np.array(action)
+            if not config.get('discrete'):
+                if eval_gaussian is not None:
+                    action = np.random.normal(action, eval_gaussian)
+                action = np.clip(action, -1, 1)
+
+            next_observation, reward, terminated, truncated, info = env.step(action)
+            done = terminated or truncated
+            step += 1
+
+            transition = dict(
+                observation=observation,
+                next_observation=next_observation,
+                action=action,
+                reward=reward,
+                done=done,
+                info=info,
+            )
+            add_to(traj, transition)
+            observation = next_observation
+        if i < num_eval_episodes:
+            info = {
+                "success": done,
+                "difference": np.linalg.norm(goal - observation)
+            }
+            add_to(stats, flatten(info))
+            trajs.append(traj)
+
+    for k, v in stats.items():
+        stats[k] = np.mean(v)
+
+    return stats, trajs, renders
