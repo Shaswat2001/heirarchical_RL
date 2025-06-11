@@ -38,7 +38,8 @@ def main(args):
     )
 
     agent = restore_agent(agent, args.restore_path, args.restore_epoch)
-    env = gym.make("HumanoidWalkEnv-v0", render_mode="human")
+    agent = supply_rng(agent.get_actions, rng=jax.random.PRNGKey(np.random.randint(0, 2**32)))
+    env = gym.make(args.env_name, keyframe="init_frame",render_mode="human")
     observation, info = env.reset(seed=42)
     rwd = []
     for _timestep in range(100000):
@@ -68,8 +69,8 @@ if __name__ == "__main__":
     parser.add_argument('--env_name', type=str, default='FrankaIkGolfCourseEnv-v0', help='Environment (dataset) name.')
 
     # Save / restore
-    parser.add_argument('--save_dir', type=str, default='exp/', help='Save directory.')
-    parser.add_argument('--save_epoch', type=int, default=100000, help='Epoch checkpoint.')
+    parser.add_argument('--restore_path', type=str, default='exp/hrl-arenaX/Debug/FrankaIkGolfCourseEnv_20250611-182542_FrankaIkGolfCourseEnv-v0', help='Save directory.')
+    parser.add_argument('--restore_epoch', type=int, default=4000000, help='Epoch checkpoint.')
 
     args = parser.parse_args()
 

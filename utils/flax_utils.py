@@ -184,6 +184,7 @@ def restore_agent(agent, restore_path, restore_epoch):
         restore_epoch: Epoch number.
     """
     candidates = glob.glob(restore_path)
+    print(candidates)
 
     assert len(candidates) == 1, f'Found {len(candidates)} candidates: {candidates}'
 

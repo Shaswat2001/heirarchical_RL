@@ -13,8 +13,8 @@ from utils.flax_utils import ModuleDict, TrainState, nonpytree_field
 GCBC_CONFIG_DICT = {
     "agent_name": 'gcbc',  # Agent name.
     "lr": 3e-4,  # Learning rate.
-    "batch_size": 1024,  # Batch size.
-    "actor_hidden_dims": (512, 512, 512),  # Actor network hidden dimensions.
+    "batch_size": 256,  # Batch size.
+    "actor_hidden_dims": (512, 512),  # Actor network hidden dimensions.
     "discount": 0.99,  # Discount factor (unused by default; can be used for geometric goal sampling in GCDataset).
     "const_std": True,  # Whether to use constant standard deviation for the actor.
     "discrete": False,  # Whether the action space is discrete.

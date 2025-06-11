@@ -29,7 +29,7 @@ def sanitize_metrics(metrics):
 
 def main(args):
 
-    exp_name = get_exp_name(args.env_name, args.env_name)
+    exp_name = get_exp_name(args.env_name, args.agents)
     setup_wandb(project='hrl-arenaX', group=args.run_group, name=exp_name)
 
     args.save_dir = os.path.join(args.save_dir, wandb.run.project, args.run_group, exp_name)
