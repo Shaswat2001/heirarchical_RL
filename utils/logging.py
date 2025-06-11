@@ -9,11 +9,11 @@ import wandb
 from PIL import Image, ImageEnhance
 
 
-def get_exp_name(env_name):
+def get_exp_name(env_name, algorithm):
 
     base_name = env_name.split("-")[0]
     timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-    exp_name = f"{base_name}_{timestamp}"
+    exp_name = f"{base_name}_{timestamp}_{algorithm}"
 
     return exp_name
 

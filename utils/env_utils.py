@@ -8,6 +8,7 @@ import numpy as np
 from gymnasium.spaces import Box
 
 import ogbench
+import sai_mujoco
 from utils.buffers import Dataset
 
 
@@ -97,3 +98,21 @@ def make_env_and_datasets(dataset_name, frame_stack=None):
     env.reset()
 
     return env, train_dataset, val_dataset
+
+def make_sai_datasets(env_name):
+
+    dir_name = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
+
+    env = gymnasium.make(env_name)
+
+    train_data = np.load(f'{dir_name}/dataset/{env_name}/train/{env_name}_train.npz', allow_pickle=True)
+    val_data = np.load(f'{dir_name}/dataset/{env_name}/val/{env_name}_val.npz', allow_pickle=True)
+    
+    train_dataset = Dataset.create(**train_data)
+    val_dataset = Dataset.create(**val_data)
+
+    return env, train_dataset, val_dataset
+
+
+
+

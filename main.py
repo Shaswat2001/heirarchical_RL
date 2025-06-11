@@ -13,7 +13,7 @@ from agents import agents
 import jax
 import jax.numpy as jnp
 from utils.buffers import buffers, Dataset
-from utils.env_utils import make_env_and_datasets
+from utils.env_utils import make_env_and_datasets, make_sai_datasets 
 from utils.logging import get_exp_name, setup_wandb, get_wandb_video
 from utils.evaluation import *
 from utils.flax_utils import save_agent
@@ -29,13 +29,17 @@ def sanitize_metrics(metrics):
 
 def main(args):
 
-    exp_name = get_exp_name(args.env_name)
+    exp_name = get_exp_name(args.env_name, args.env_name)
     setup_wandb(project='hrl-arenaX', group=args.run_group, name=exp_name)
 
     args.save_dir = os.path.join(args.save_dir, wandb.run.project, args.run_group, exp_name)
     os.makedirs(args.save_dir, exist_ok=True)
 
-    env, train_dataset, val_dataset = make_env_and_datasets(args.env_name)
+    if args.env_module == "ogbench":
+        env, train_dataset, val_dataset = make_env_and_datasets(args.env_name)
+    else:
+        env, train_dataset, val_dataset = make_sai_datasets(args.env_name)
+        
     random.seed(args.seed)
     np.random.seed(args.seed)
 
@@ -73,45 +77,45 @@ def main(args):
             wandb.log(sanitize_metrics(train_metrics), step=i)
 
         # Evaluate agent.
-        if i == 1 or i % args.eval_interval == 0:
-            if args.eval_on_cpu:
-                eval_agent = jax.device_put(agent, device=jax.devices('cpu')[0])
-            else:
-                eval_agent = agent
-            renders = []
-            eval_metrics = {}
-            overall_metrics = defaultdict(list)
-            task_infos = env.unwrapped.task_infos if hasattr(env.unwrapped, 'task_infos') else env.task_infos
-            num_tasks = args.eval_tasks if args.eval_tasks is not None else len(task_infos)
-            for task_id in tqdm.trange(1, num_tasks + 1):
-                task_name = task_infos[task_id - 1]['task_name']
-                eval_info, trajs, cur_renders = evaluate(
-                    agent=eval_agent,
-                    env=env,
-                    task_id=task_id,
-                    config=agent_config,
-                    num_eval_episodes=args.eval_episodes,
-                    num_video_episodes=args.video_episodes,
-                    video_frame_skip=args.video_frame_skip,
-                    eval_temperature=args.eval_temperature,
-                    eval_gaussian=args.eval_gaussian,
-                )
-                renders.extend(cur_renders)
-                metric_names = ['success']
-                eval_metrics.update(
-                    {f'evaluation/{task_name}_{k}': v for k, v in eval_info.items() if k in metric_names}
-                )
-                for k, v in eval_info.items():
-                    if k in metric_names:
-                        overall_metrics[k].append(v)
-            for k, v in overall_metrics.items():
-                eval_metrics[f'evaluation/overall_{k}'] = np.mean(v)
+        # if i == 1 or i % args.eval_interval == 0:
+        #     if args.eval_on_cpu:
+        #         eval_agent = jax.device_put(agent, device=jax.devices('cpu')[0])
+        #     else:
+        #         eval_agent = agent
+        #     renders = []
+        #     eval_metrics = {}
+        #     overall_metrics = defaultdict(list)
+        #     task_infos = env.unwrapped.task_infos if hasattr(env.unwrapped, 'task_infos') else env.task_infos
+        #     num_tasks = args.eval_tasks if args.eval_tasks is not None else len(task_infos)
+        #     for task_id in tqdm.trange(1, num_tasks + 1):
+        #         task_name = task_infos[task_id - 1]['task_name']
+        #         eval_info, trajs, cur_renders = evaluate(
+        #             agent=eval_agent,
+        #             env=env,
+        #             task_id=task_id,
+        #             config=agent_config,
+        #             num_eval_episodes=args.eval_episodes,
+        #             num_video_episodes=args.video_episodes,
+        #             video_frame_skip=args.video_frame_skip,
+        #             eval_temperature=args.eval_temperature,
+        #             eval_gaussian=args.eval_gaussian,
+        #         )
+        #         renders.extend(cur_renders)
+        #         metric_names = ['success']
+        #         eval_metrics.update(
+        #             {f'evaluation/{task_name}_{k}': v for k, v in eval_info.items() if k in metric_names}
+        #         )
+        #         for k, v in eval_info.items():
+        #             if k in metric_names:
+        #                 overall_metrics[k].append(v)
+        #     for k, v in overall_metrics.items():
+        #         eval_metrics[f'evaluation/overall_{k}'] = np.mean(v)
 
-            # if args.video_episodes > 0:
-            #     video = get_wandb_video(renders=renders, n_cols=num_tasks)
-            #     eval_metrics['video'] = video
+        #     # if args.video_episodes > 0:
+        #     #     video = get_wandb_video(renders=renders, n_cols=num_tasks)
+        #     #     eval_metrics['video'] = video
 
-            wandb.log(sanitize_metrics(eval_metrics), step=i)
+        #     wandb.log(sanitize_metrics(eval_metrics), step=i)
 
         # Save agent.
         if i % args.save_interval == 0:
@@ -124,9 +128,10 @@ if __name__ == "__main__":
 
     parser.add_argument('--run_group', type=str, default='Debug', help='Run group.')
     parser.add_argument('--seed', type=int, default=0, help='Random seed.')
-    parser.add_argument('--agents', type=str, default="hiql", help='Agent to load.')
+    parser.add_argument('--agents', type=str, default="gcbc", help='Agent to load.')
 
     # Environment
+    parser.add_argument('--env_module', type=str, default='ogbench', help='Environment (dataset) name.')
     parser.add_argument('--env_name', type=str, default='antmaze-medium-navigate-v0', help='Environment (dataset) name.')
     parser.add_argument('--dataset_dir', type=str, default="~/.ogbench/data", help='Dataset directory.')
     parser.add_argument('--dataset_replace_interval', type=int, default=1000, help='Dataset replace interval.')
