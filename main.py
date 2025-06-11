@@ -170,7 +170,7 @@ if __name__ == "__main__":
     parser.add_argument('--save_interval', type=int, default=1000000, help='Saving interval.')
 
     # Evaluation
-    parser.add_argument('--eval_episodes', type=int, default=2, help='Number of episodes for each task.')
+    parser.add_argument('--eval_episodes', type=int, default=51, help='Number of episodes for each task.')
     parser.add_argument('--eval_temperature', type=float, default=0, help='Actor temperature for evaluation.')
     parser.add_argument('--eval_gaussian', type=float, default=None, help='Action Gaussian noise for evaluation.')
     parser.add_argument('--eval_tasks', type=float, default=None, help='Number of tasks to evaluate (None for all).')

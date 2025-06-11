@@ -152,19 +152,7 @@ def evaluate_sai(
         should_render = i >= num_eval_episodes
 
         observation, info = env.reset()
-        data_str = """
-        5.2901417e-01  7.7292925e-01  2.0322290e-01 -1.6966331e+00
-        2.1188314e+00  1.9888296e+00 -1.8227720e+00  9.9988272e-03
-        9.9982079e-03 -5.0462088e-08  1.5995282e-09 -1.7151105e-07
-        2.2123430e-07  3.6067107e-08  1.2647618e-07 -3.1669245e-07
-        9.3663971e-07  5.0173782e-07 -6.2188178e-01 -3.2543231e-02
-        3.9842088e-02 -6.8669999e-01  0.0000000e+00  2.5000000e-02
-        3.1797579e-01 -1.3466152e-02  1.4644498e-01  6.9714880e-01
-        -2.9248243e-02  8.6625637e-03  7.1627724e-01
-        """
-
-        goal = np.fromstring(data_str, sep=' ')
-        # goal = info.get('goal')
+        goal = info.get('goal')
         # goal_frame = info.get('goal_rendered')
         done = False
         step = 0
@@ -191,10 +179,6 @@ def evaluate_sai(
             add_to(traj, transition)
             observation = next_observation
         if i < num_eval_episodes:
-            info = {
-                "success": done,
-                "difference": np.linalg.norm(goal - observation)
-            }
             add_to(stats, flatten(info))
             trajs.append(traj)
 
