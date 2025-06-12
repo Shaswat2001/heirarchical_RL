@@ -14,7 +14,7 @@ from utils.flax_utils import save_agent, restore_agent
 
 def main(args):
 
-    data = np.load('/Users/shaswatgarg/Documents/Job/ArenaX/Development/heirarchical_RL/dataset/FrankaIkGolfCourseEnv-v0/val/FrankaIkGolfCourseEnv-v0_val.npz', allow_pickle=True)
+    data = np.load('/home/ubuntu/uploads/heirarchical_RL/dataset/FrankaIkGolfCourseEnv-v0/train/FrankaIkGolfCourseEnv-v0_train.npz', allow_pickle=True)
 
     # List all arrays stored in the file
     print("Keys in the .npz file:", data.files)
@@ -26,7 +26,7 @@ def main(args):
 
     for i in data["actions"]:
         print(i)
-    env = gym.make("HumanoidWalkEnv-v0", render_mode="human")
+    env = gym.make(args.env_name, keyframe="init_frame",render_mode="human")
     observation, info = env.reset(seed=42)
     rwd = []
     for i in range(len(data["observations"])):
@@ -34,7 +34,6 @@ def main(args):
         print(action)
         action = np.array(action)
         observation, reward, terminated, truncated, info = env.step(action)
-        rwd.append(reward)
         env.render()
 
         if terminated or truncated:

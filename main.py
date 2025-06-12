@@ -164,7 +164,7 @@ if __name__ == "__main__":
     parser.add_argument('--restore_epoch', type=int, default=None, help='Restore epoch.')
 
     # Training steps and logging
-    parser.add_argument('--offline_steps', type=int, default=5000000, help='Number of offline steps.')
+    parser.add_argument('--offline_steps', type=int, default=10000000, help='Number of offline steps.')
     parser.add_argument('--log_interval', type=int, default=10000, help='Logging interval.')
     parser.add_argument('--eval_interval', type=int, default=250000, help='Evaluation interval.')
     parser.add_argument('--save_interval', type=int, default=1000000, help='Saving interval.')

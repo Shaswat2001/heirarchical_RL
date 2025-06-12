@@ -45,6 +45,7 @@ def main(args):
     for _timestep in range(100000):
         action = agent(observation=observation, goal=info.get("goal"), temperature=0.0)
         action = np.array(action)
+        print(action)
         observation, reward, terminated, truncated, info = env.step(action)
         rwd.append(reward)
         env.render()

@@ -22,10 +22,15 @@ class MLP(nn.Module):
         
         for i, size in enumerate(self.hidden_layers):
             x = nn.Dense(size, kernel_init=self.kernel_init)(x)
-            if i + 1 < len(self.hidden_layers) or self.activate_final:
+            if i + 1 < len(self.hidden_layers):
                 x = self.activation(x)
                 if self.layer_norm:
                     x = nn.LayerNorm()(x)
+            elif self.activate_final:
+                x = nn.tanh(x)
+                if self.layer_norm:
+                    x = nn.LayerNorm()(x)
+                
             if i == len(self.hidden_layers) - 2:
                 self.sow('intermediates', 'feature', x)
         return x
@@ -40,7 +45,7 @@ class GCActor(nn.Module):
 
     def setup(self):
         
-        self.actor_net = MLP(self.hidden_layers, activate_final= True)
+        self.actor_net = MLP(self.hidden_layers, activate_final= True, layer_norm= True)
         self.mean_net = nn.Dense(self.action_dim, kernel_init=default_init(self.final_fc_init_scale))
 
         self.log_std_net = nn.Dense(self.action_dim, kernel_init=default_init(self.final_fc_init_scale))

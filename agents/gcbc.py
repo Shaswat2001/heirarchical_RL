@@ -16,6 +16,7 @@ GCBC_CONFIG_DICT = {
     "batch_size": 256,  # Batch size.
     "actor_hidden_dims": (512, 512),  # Actor network hidden dimensions.
     "discount": 0.99,  # Discount factor (unused by default; can be used for geometric goal sampling in GCDataset).
+    "clip_threshold": 10.0,
     "const_std": True,  # Whether to use constant standard deviation for the actor.
     "discrete": False,  # Whether the action space is discrete.
     # Dataset hyperparameters.
@@ -118,7 +119,11 @@ class GCBCAgent(flax.struct.PyTreeNode):
         network_args = {k: v[1] for k,v in network_info.items()}
 
         network_def = ModuleDict(network)
-        network_tx = optax.adam(learning_rate=_cfg['lr'])
+        network_tx = optax.chain(
+            optax.clip_by_global_norm(_cfg['clip_threshold']),
+            optax.adam(_cfg['lr'])
+        )
+        # network_tx = optax.adam(learning_rate=_cfg['lr'])
         network_params = network_def.init(init_rng, **network_args)['params']
         network = TrainState.create(network_def, network_params, tx=network_tx)
 
