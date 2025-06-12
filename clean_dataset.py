@@ -34,8 +34,12 @@ def main(args):
         for i in range(len(ep["actions"])):
             action = ep["actions"][i]
             action = np.array(action)
+
             observation, reward, terminated, truncated, info = env.step(action)
-            env.render()
+            # env.render()
+            if i < 125 and (ep["actions"][i] == ep["actions"][i+1]).all() and (ep["actions"][i][:-1] == np.zeros((6))).all():
+                print("TRUE")
+                continue
 
             temp_obs.append(ep["observations"][i])
             temp_actions.append(ep["actions"][i])
@@ -45,6 +49,7 @@ def main(args):
             print("epsiode data: ", ep["info"][i]["success"])
             print("env data: ", terminated)
             if done:
+                print(i)
                 user_input = input("Keep this trajectory? (y/n): ").strip().lower()
                 if user_input == 'y':
                     all_obs.extend(temp_obs)
