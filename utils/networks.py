@@ -12,7 +12,7 @@ def default_init(scale=1.0):
 class MLP(nn.Module):
 
     hidden_layers: Sequence[int]
-    activation: Any = nn.gelu
+    activation: Any = nn.relu
     activate_final: bool = False
     kernel_init: Any = default_init()
     layer_norm: bool = False
@@ -22,12 +22,8 @@ class MLP(nn.Module):
         
         for i, size in enumerate(self.hidden_layers):
             x = nn.Dense(size, kernel_init=self.kernel_init)(x)
-            if i + 1 < len(self.hidden_layers):
+            if i + 1 < len(self.hidden_layers) or self.activate_final:
                 x = self.activation(x)
-                if self.layer_norm:
-                    x = nn.LayerNorm()(x)
-            elif self.activate_final:
-                x = nn.tanh(x)
                 if self.layer_norm:
                     x = nn.LayerNorm()(x)
                 
@@ -41,7 +37,7 @@ class GCActor(nn.Module):
     action_dim: int
     final_fc_init_scale: float = 1e-2
     log_std_min: Optional[float] = -5
-    log_std_max: Optional[float] = 2
+    log_std_max: Optional[float] = 0.0
 
     def setup(self):
         
@@ -65,6 +61,29 @@ class GCActor(nn.Module):
         distribution = distrax.MultivariateNormalDiag(loc=means, scale_diag=jnp.exp(log_stds) * temperature)
         return distribution
     
+class GCDetActor(nn.Module):
+
+    hidden_layers: Sequence[int]
+    action_dim: int
+    final_fc_init_scale: float = 1e-2
+
+    def setup(self):
+        
+        self.actor_net = MLP(self.hidden_layers, activate_final= True, layer_norm= True)
+        self.action_net = nn.Dense(self.action_dim, kernel_init=default_init(self.final_fc_init_scale))
+    
+    def __call__(self, observations, goal = None, temperature = 1.0):
+        
+        inputs = [observations]
+        if goal is not None:
+            inputs.append(goal)
+        inputs = jnp.concatenate(inputs, axis=-1)
+        outputs = self.actor_net(inputs)
+
+        means = self.action_net(outputs)
+
+        return nn.tanh(means) 
+       
 class GCValue(nn.Module):
 
     hidden_layers: Sequence[int]

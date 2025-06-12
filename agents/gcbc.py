@@ -6,7 +6,7 @@ import jax.numpy as jnp
 
 import copy
 import functools
-from utils.networks import GCActor
+from utils.networks import GCActor, GCDetActor
 from typing import Any
 from utils.flax_utils import ModuleDict, TrainState, nonpytree_field
 
@@ -30,6 +30,7 @@ GCBC_CONFIG_DICT = {
     "actor_p_randomgoal": 0.0,  # Probability of using a random state as the actor goal.
     "actor_geom_sample": False,  # Whether to use geometric sampling for future actor goals.
     "gc_negative": True,  # Unused (defined for compatibility with GCDataset).
+    "bc_method": "mse"
 }
 
 class GCBCAgent(flax.struct.PyTreeNode):
@@ -59,6 +60,19 @@ class GCBCAgent(flax.struct.PyTreeNode):
         )
 
         return actor_loss, actor_info
+    
+    @jax.jit
+    def actor_mse_loss(self, batch, grad_params, rng=None):
+
+        actions = self.network.select('actor')(batch['observations'], batch['actor_goals'], params=grad_params)
+
+        actor_loss = ((actions - batch['actions'])**2).mean()
+
+        actor_info = {
+            'actor_loss': actor_loss,
+        }
+
+        return actor_loss, actor_info
 
     @jax.jit
     def total_loss(self, batch, grad_params, rng=None):
@@ -67,7 +81,10 @@ class GCBCAgent(flax.struct.PyTreeNode):
         rng = rng if rng is not None else self.rng
 
         rng, actor_rng = jax.random.split(rng)
-        actor_loss, actor_info = self.actor_loss(batch, grad_params, actor_rng)
+        if self.config["bc_method"] == "mse":
+            actor_loss, actor_info = self.actor_mse_loss(batch, grad_params, actor_rng)
+        else:
+            actor_loss, actor_info = self.actor_loss(batch, grad_params, actor_rng)
         for k, v in actor_info.items():
             info[f'actor/{k}'] = v
 
@@ -88,9 +105,12 @@ class GCBCAgent(flax.struct.PyTreeNode):
 
     def get_actions(self, observation, goal= None, seed= None, temperature= 1.0):
 
-        dist = self.network.select('actor')(observation, goal, temperature=temperature)
-        actions = dist.sample(seed= seed)
-        actions = jnp.clip(actions, -1.0, 1.0)
+        if self.config["bc_method"] == "mse":
+            actions = self.network.select('actor')(observation, goal)
+        else:
+            dist = self.network.select('actor')(observation, goal, temperature=temperature)
+            actions = dist.sample(seed= seed)
+            actions = jnp.clip(actions, -1.0, 1.0)
 
         return actions
 
@@ -106,10 +126,16 @@ class GCBCAgent(flax.struct.PyTreeNode):
 
         action_dim = ex_actions.shape[-1]
 
-        actor_def = GCActor(
-            hidden_layers=_cfg['actor_hidden_dims'],
-            action_dim=action_dim,
-        )
+        if _cfg["bc_method"] == "mse":
+            actor_def = GCDetActor(
+                hidden_layers=_cfg['actor_hidden_dims'],
+                action_dim=action_dim,
+            )
+        else:
+            actor_def = GCActor(
+                hidden_layers=_cfg['actor_hidden_dims'],
+                action_dim=action_dim,
+            )
 
         network_info = dict(
             actor=(actor_def, (ex_observations, ex_observations))
@@ -119,11 +145,11 @@ class GCBCAgent(flax.struct.PyTreeNode):
         network_args = {k: v[1] for k,v in network_info.items()}
 
         network_def = ModuleDict(network)
-        network_tx = optax.chain(
-            optax.clip_by_global_norm(_cfg['clip_threshold']),
-            optax.adam(_cfg['lr'])
-        )
-        # network_tx = optax.adam(learning_rate=_cfg['lr'])
+        # network_tx = optax.chain(
+        #     optax.clip_by_global_norm(_cfg['clip_threshold']),
+        #     optax.adam(_cfg['lr'])
+        # )
+        network_tx = optax.adam(learning_rate=_cfg['lr'])
         network_params = network_def.init(init_rng, **network_args)['params']
         network = TrainState.create(network_def, network_params, tx=network_tx)
 

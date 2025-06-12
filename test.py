@@ -70,8 +70,8 @@ if __name__ == "__main__":
     parser.add_argument('--env_name', type=str, default='FrankaIkGolfCourseEnv-v0', help='Environment (dataset) name.')
 
     # Save / restore
-    parser.add_argument('--restore_path', type=str, default='exp/hrl-arenaX/Debug/FrankaIkGolfCourseEnv_20250611-182542_FrankaIkGolfCourseEnv-v0', help='Save directory.')
-    parser.add_argument('--restore_epoch', type=int, default=4000000, help='Epoch checkpoint.')
+    parser.add_argument('--restore_path', type=str, default='exp/hrl-arenaX/Debug/FrankaIkGolfCourseEnv_20250612-051908_gcbc', help='Save directory.')
+    parser.add_argument('--restore_epoch', type=int, default=10000000, help='Epoch checkpoint.')
 
     args = parser.parse_args()
 
