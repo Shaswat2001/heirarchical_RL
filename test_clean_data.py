@@ -16,53 +16,24 @@ from utils.flax_utils import save_agent, restore_agent
 def main(args):
 
     dir_name = os.path.dirname(os.path.realpath(__file__))
-    data = np.load(f'{dir_name}/dataset/FrankaIkGolfCourseEnv-v0/train/FrankaIkGolfCourseEnv-v0_train.npz', allow_pickle=True)
-
-    # List all arrays stored in the file
-    print("Keys in the .npz file:", data.files)
+    ep = np.load(f'/Users/shaswatgarg/Documents/Job/ArenaX/Development/heirarchical_RL/dataset/FrankaIkGolfCourseEnv-v0/filtered_data_20250604_135129.npz', allow_pickle=True)
 
     env = gym.make(args.env_name, keyframe="init_frame",render_mode="human")
     observation, info = env.reset(seed=42)
-    rwd = []
 
-    all_obs = []
-    all_actions = []
-    all_terminals = []
-
-    temp_obs = []
-    temp_actions = []
-    temp_terminals = []
-    
-    for i in range(len(data["observations"])):
-        action = data["actions"][i]
+    for i in range(len(ep["actions"])):
+        action = ep["actions"][i]
         action = np.array(action)
-
-        temp_obs.append(data["observations"][i])
-        temp_actions.append(data["actions"][i])
-        temp_terminals.append(data["terminals"][i])
-
         observation, reward, terminated, truncated, info = env.step(action)
         env.render()
 
-        done = terminated or data["terminals"][i]
-        print(data["terminals"][i])
+        done = ep["terminals"][i]
+        print("epsiode state data: ", ep["observations"][i])
+        print("epsiode done data: ", ep["terminals"][i])
+        print("epsiode action data: ", ep["actions"][i])
         if done:
             user_input = input("Keep this trajectory? (y/n): ").strip().lower()
-            if user_input == 'y':
-                all_obs.extend(temp_obs)
-                all_actions.extend(temp_actions)
-                all_terminals.extend(temp_terminals)
-            # reset trajectory buffers
-            temp_obs, temp_actions, temp_terminals = [], [], []
             observation, info = env.reset()
-
-    output_path = f'{dir_name}/filtered_data.npz'
-    np.savez_compressed(
-        output_path,
-        observations=np.array(all_obs),
-        actions=np.array(all_actions),
-        terminals=np.array(all_terminals)
-    )
 
     env.close()
     

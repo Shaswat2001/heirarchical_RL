@@ -16,52 +16,51 @@ from utils.flax_utils import save_agent, restore_agent
 def main(args):
 
     dir_name = os.path.dirname(os.path.realpath(__file__))
-    data = np.load(f'{dir_name}/dataset/FrankaIkGolfCourseEnv-v0/train/FrankaIkGolfCourseEnv-v0_train.npz', allow_pickle=True)
-
-    # List all arrays stored in the file
-    print("Keys in the .npz file:", data.files)
+    folder = "20250604_140137"
+    data = np.load(f'/Users/shaswatgarg/Downloads/data/train/FrankaIkGolfCourseEnv-v0/{folder}/episodes.npy', allow_pickle=True)
 
     env = gym.make(args.env_name, keyframe="init_frame",render_mode="human")
     observation, info = env.reset(seed=42)
-    rwd = []
 
     all_obs = []
     all_actions = []
     all_terminals = []
 
-    temp_obs = []
-    temp_actions = []
-    temp_terminals = []
-    
-    for i in range(len(data["observations"])):
-        action = data["actions"][i]
-        action = np.array(action)
+    for ep in data:
+        temp_obs = []
+        temp_actions = []
+        temp_terminals = []
 
-        temp_obs.append(data["observations"][i])
-        temp_actions.append(data["actions"][i])
-        temp_terminals.append(data["terminals"][i])
+        for i in range(len(ep["actions"])):
+            action = ep["actions"][i]
+            action = np.array(action)
+            observation, reward, terminated, truncated, info = env.step(action)
+            env.render()
 
-        observation, reward, terminated, truncated, info = env.step(action)
-        env.render()
+            temp_obs.append(ep["observations"][i])
+            temp_actions.append(ep["actions"][i])
 
-        done = terminated or data["terminals"][i]
-        print(data["terminals"][i])
-        if done:
-            user_input = input("Keep this trajectory? (y/n): ").strip().lower()
-            if user_input == 'y':
-                all_obs.extend(temp_obs)
-                all_actions.extend(temp_actions)
-                all_terminals.extend(temp_terminals)
-            # reset trajectory buffers
-            temp_obs, temp_actions, temp_terminals = [], [], []
-            observation, info = env.reset()
+            done = terminated or ep["info"][i]["success"]
+            temp_terminals.append(done)
+            print("epsiode data: ", ep["info"][i]["success"])
+            print("env data: ", terminated)
+            if done:
+                user_input = input("Keep this trajectory? (y/n): ").strip().lower()
+                if user_input == 'y':
+                    all_obs.extend(temp_obs)
+                    all_actions.extend(temp_actions)
+                    all_terminals.extend(temp_terminals)
+                # reset trajectory buffers
+                temp_obs, temp_actions, temp_terminals = [], [], []
+                observation, info = env.reset()
+                break
 
-    output_path = f'{dir_name}/filtered_data.npz'
+    output_path = f'{dir_name}/dataset/FrankaIkGolfCourseEnv-v0/filtered_data_{folder}.npz'
     np.savez_compressed(
         output_path,
-        observations=np.array(all_obs),
-        actions=np.array(all_actions),
-        terminals=np.array(all_terminals)
+        observations=np.array(all_obs, dtype=np.float32),
+        actions=np.array(all_actions, dtype=np.float32),
+        terminals=np.array(all_terminals, dtype=bool)
     )
 
     env.close()
