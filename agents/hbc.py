@@ -10,17 +10,18 @@ from utils.networks import GCActor, GCDetActor
 from typing import Any, Sequence
 from utils.flax_utils import ModuleDict, TrainState, nonpytree_field
 
-GCBC_CONFIG_DICT = {
-    "agent_name": 'gcbc',  # Agent name.
+HBC_CONFIG_DICT = {
+    "agent_name": 'hbc',  # Agent name.
     "lr": 3e-5,  # Learning rate.
     "batch_size": 1024,  # Batch size.
-    "actor_hidden_dims": (512, 512),  # Actor network hidden dimensions.
+    "actor_hidden_dims": (512, 512, 512),  # Actor network hidden dimensions.
     "discount": 0.99,  # Discount factor (unused by default; can be used for geometric goal sampling in GCDataset).
     "clip_threshold": 10.0,
+    "subgoal_step": 10, # step k to get subgoal
     "const_std": True,  # Whether to use constant standard deviation for the actor.
     "discrete": False,  # Whether the action space is discrete.
     # Dataset hyperparameters.
-    "dataset_class": 'GCDataset',  # Dataset class name.
+    "dataset_class": 'HGCDataset',  # Dataset class name.
     "value_p_curgoal": 0.0,  # Unused (defined for compatibility with GCDataset).
     "value_p_trajgoal": 1.0,  # Unused (defined for compatibility with GCDataset).
     "value_p_randomgoal": 0.0,  # Unused (defined for compatibility with GCDataset).
@@ -33,17 +34,37 @@ GCBC_CONFIG_DICT = {
     "bc_method": "mse"
 }
 
-class GCBCAgent(flax.struct.PyTreeNode):
+class HBCAgent(flax.struct.PyTreeNode):
 
     rng: Any
     network: Any
     config: Any = nonpytree_field()
     weights: Sequence[int] = (1000, 1000, 1000, 1000, 1000, 1000, 1)
 
-    @jax.jit
-    def actor_loss(self, batch, grad_params, rng=None):
+    def high_actor_loss(self, batch, grad_params, rng=None):
 
-        dist = self.network.select('actor')(batch['observations'], batch['actor_goals'], params=grad_params)
+        dist = self.network.select('high_actor')(batch['observations'], batch['high_actor_goals'], params=grad_params)
+        log_prob = dist.log_prob(batch['high_actor_targets'])
+
+        actor_loss = -log_prob.mean()
+
+        actor_info = {
+            'actor_loss': actor_loss,
+            'bc_log_prob': log_prob.mean(),
+        }
+
+        actor_info.update(
+            {
+                'mse': jnp.mean((dist.mode() - batch['high_actor_targets']) ** 2),
+                'std': jnp.mean(dist.scale_diag),
+            }
+        )
+
+        return actor_loss, actor_info
+    
+    def low_actor_loss(self, batch, grad_params, rng=None):
+
+        dist = self.network.select('low_actor')(batch['observations'], batch['low_level_actor_goals'], params=grad_params)
         log_prob = dist.log_prob(batch['actions'])
 
         actor_loss = -log_prob.mean()
@@ -62,10 +83,9 @@ class GCBCAgent(flax.struct.PyTreeNode):
 
         return actor_loss, actor_info
     
-    @jax.jit
-    def actor_mse_loss(self, batch, grad_params, rng=None):
+    def low_actor_mse_loss(self, batch, grad_params, rng=None):
 
-        actions = self.network.select('actor')(batch['observations'], batch['actor_goals'], params=grad_params)
+        actions = self.network.select('low_actor')(batch['observations'], batch['low_level_actor_goals'], params=grad_params)
 
         actor_loss = optax.huber_loss(actions, batch['actions']) * self.weights
         actor_loss = actor_loss.mean() 
@@ -83,15 +103,22 @@ class GCBCAgent(flax.struct.PyTreeNode):
         info = {}
         rng = rng if rng is not None else self.rng
 
-        rng, actor_rng = jax.random.split(rng)
-        if self.config["bc_method"] == "mse":
-            actor_loss, actor_info = self.actor_mse_loss(batch, grad_params, actor_rng)
-        else:
-            actor_loss, actor_info = self.actor_loss(batch, grad_params, actor_rng)
-        for k, v in actor_info.items():
-            info[f'actor/{k}'] = v
+        rng, high_actor_rng = jax.random.split(rng)
+        high_actor_loss, high_actor_info = self.high_actor_loss(batch, grad_params, high_actor_rng)
 
-        loss = actor_loss
+        rng, low_actor_rng = jax.random.split(rng)
+        if self.config["bc_method"] == "mse":
+            low_actor_loss, low_actor_info = self.low_actor_mse_loss(batch, grad_params, low_actor_rng)
+        else:
+            low_actor_loss, low_actor_info = self.low_actor_loss(batch, grad_params, low_actor_rng)
+        
+        for k, v in high_actor_info.items():
+            info[f'high_actor/{k}'] = v
+
+        for k, v in low_actor_info.items():
+            info[f'low_actor/{k}'] = v
+
+        loss = low_actor_loss + high_actor_loss
         return loss, info
 
     @jax.jit
@@ -108,11 +135,15 @@ class GCBCAgent(flax.struct.PyTreeNode):
 
     def get_actions(self, observation, goal= None, seed= None, temperature= 1.0):
 
+        high_seed, low_seed = jax.random.split(seed)
+        subgoal_dist = self.network.select('high_actor')(observation, goal, temperature=temperature)
+        sub_goal = subgoal_dist.sample(seed= high_seed)
+
         if self.config["bc_method"] == "mse":
-            actions = self.network.select('actor')(observation, goal)
+            actions = self.network.select('low_actor')(observation, sub_goal)
         else:
-            dist = self.network.select('actor')(observation, goal, temperature=temperature)
-            actions = dist.sample(seed= seed)
+            dist = self.network.select('low_actor')(observation, sub_goal, temperature=temperature)
+            actions = dist.sample(seed= low_seed)
             actions = jnp.clip(actions, -1.0, 1.0)
 
         return actions
@@ -123,25 +154,31 @@ class GCBCAgent(flax.struct.PyTreeNode):
         rng = jax.random.PRNGKey(seed)
         rng, init_rng = jax.random.split(rng, 2)
 
-
-        _cfg = copy.deepcopy(GCBC_CONFIG_DICT)
+        _cfg = copy.deepcopy(HBC_CONFIG_DICT)
         _cfg.update(cfg if cfg is not None else {})
 
         action_dim = ex_actions.shape[-1]
+        state_dim = ex_observations.shape[-1]
 
+        high_actor_def = GCActor(
+            hidden_layers=_cfg['actor_hidden_dims'],
+            action_dim=state_dim,
+        )
+        
         if _cfg["bc_method"] == "mse":
-            actor_def = GCDetActor(
+            low_actor_def = GCDetActor(
                 hidden_layers=_cfg['actor_hidden_dims'],
                 action_dim=action_dim,
             )
         else:
-            actor_def = GCActor(
+            low_actor_def = GCActor(
                 hidden_layers=_cfg['actor_hidden_dims'],
                 action_dim=action_dim,
             )
 
         network_info = dict(
-            actor=(actor_def, (ex_observations, ex_observations))
+            high_actor=(high_actor_def, (ex_observations, ex_observations)),
+            low_actor=(low_actor_def, (ex_observations, ex_observations))
         )
 
         weights = jnp.array((1000, 1000, 1000, 1000, 1000, 1000, 1)).reshape(1,-1)
@@ -150,10 +187,6 @@ class GCBCAgent(flax.struct.PyTreeNode):
         network_args = {k: v[1] for k,v in network_info.items()}
 
         network_def = ModuleDict(network)
-        # network_tx = optax.chain(
-        #     optax.clip_by_global_norm(_cfg['clip_threshold']),
-        #     optax.adam(_cfg['lr'])
-        # )
         network_tx = optax.adam(learning_rate=_cfg['lr'])
         network_params = network_def.init(init_rng, **network_args)['params']
         network = TrainState.create(network_def, network_params, tx=network_tx)

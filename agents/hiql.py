@@ -11,18 +11,18 @@ from typing import Any
 from utils.flax_utils import ModuleDict, TrainState, nonpytree_field
 
 HIQL_CONFIG_DICT = {
-    "agent_name": 'gciql',  # Agent name.
-    "lr": 3e-4,  # Learning rate.
+    "agent_name": 'hiql',  # Agent name.
+    "lr": 1e-4,  # Learning rate.
     "batch_size": 1024,  # Batch size.
     "actor_hidden_dims": (512, 512, 512),  # Actor network hidden dimensions.
-    "value_hidden_dims": (256, 256),  # Value network hidden dimensions.
-    "beta": 0.3, # Temperature in AWR.
+    "value_hidden_dims": (512, 512, 512),  # Value network hidden dimensions.
+    "beta": 3.0, # Temperature in AWR.
     "layer_norm": True,  # Whether to use layer normalization.
     "tau": 0.005,
-    "expectile_tau": 0.9,  # IQL expectile.
-    "subgoal_step": 2, # step k to get subgoal
+    "expectile_tau": 0.7,  # IQL expectile.
+    "subgoal_step": 25, # step k to get subgoal
     "discount": 0.99,  # Discount factor (unused by default; can be used for geometric goal sampling in GCDataset).
-    "const_std": True,  # Whether to use constant standard deviation for the actor.
+    "const_std": False,  # Whether to use constant standard deviation for the actor.
     "discrete": False,  # Whether the action space is discrete.
     # Dataset hyperparameters.
     "dataset_class": 'HGCDataset',  # Dataset class name.
@@ -43,36 +43,39 @@ class HIQLAgent(flax.struct.PyTreeNode):
     network: Any
     config: Any = nonpytree_field()
 
-    def expectile_loss(self, diff, expecitile):
+    @staticmethod
+    def expectile_loss(adv, diff, expectile):
 
-        val = jnp.where(diff > 0, expecitile, (1 - expecitile))
+        val = jnp.where(adv >= 0, expectile, (1 - expectile))
         return val * (diff**2)
 
-    @jax.jit
     def value_loss(self, batch, grad_params):
         
-        next_v = self.network.select("target_value")(batch["next_observations"], batch["value_goals"], params=grad_params)
+        next_v = self.network.select("target_value")(batch["next_observations"], batch["value_goals"])
         
         target_v = batch["rewards"] + self.config["discount"]*batch["masks"]*next_v
 
-        v = self.network.select("value")(batch["observations"], batch["value_goals"], params=grad_params)
+        v = self.network.select("target_value")(batch["observations"], batch["value_goals"])
 
-        value_loss = self.expectile_loss(target_v - v, self.config["expectile_tau"]).mean()
+        adv = target_v - v
+
+        v_c = self.network.select("value")(batch["observations"], batch["value_goals"], params=grad_params)
+
+        value_loss = self.expectile_loss(adv, target_v - v_c, self.config["expectile_tau"]).mean()
 
         value_info = {
             "value_loss" :  value_loss,
-            "v_mean" : v.mean(),
-            "v_max" :  v.max(),
-            "v_min" :  v.min(),
+            "v_mean" : v_c.mean(),
+            "v_max" :  v_c.max(),
+            "v_min" :  v_c.min(),
         }
 
         return value_loss, value_info
         
-    @jax.jit
     def high_actor_loss(self, batch, grad_params, rng=None):
 
-        v = self.network.select("value")(batch["observations"], batch["high_actor_goals"], params=grad_params)
-        next_v = self.network.select("value")(batch["high_actor_targets"], batch["high_actor_goals"], params=grad_params)
+        v = self.network.select("value")(batch["observations"], batch["high_actor_goals"])
+        next_v = self.network.select("value")(batch["high_actor_targets"], batch["high_actor_goals"])
 
         adv = next_v - v
         exp_adv = jnp.minimum(jnp.exp(self.config["beta"]*adv),100)
@@ -92,11 +95,10 @@ class HIQLAgent(flax.struct.PyTreeNode):
 
         return actor_loss, actor_info
     
-    @jax.jit
     def low_actor_loss(self, batch, grad_params, rng=None):
 
-        v = self.network.select("value")(batch["observations"], batch["low_level_actor_goals"], params=grad_params)
-        next_v = self.network.select("value")(batch["next_observations"], batch["low_level_actor_goals"], params=grad_params)
+        v = self.network.select("value")(batch["observations"], batch["low_level_actor_goals"])
+        next_v = self.network.select("value")(batch["next_observations"], batch["low_level_actor_goals"])
 
         adv = next_v - v
         exp_adv = jnp.minimum(jnp.exp(self.config["beta"]*adv),100)
@@ -161,13 +163,15 @@ class HIQLAgent(flax.struct.PyTreeNode):
 
         return self.replace(network=new_network, rng=new_rng), info
 
+    @jax.jit
     def get_actions(self, observation, goal= None, seed= None, temperature= 1.0):
-
+        
+        high_seed, low_seed = jax.random.split(seed)
         subgoal_dist = self.network.select('high_actor')(observation, goal, temperature=temperature)
-        sub_goal = subgoal_dist.sample(seed= seed)
+        sub_goal = subgoal_dist.sample(seed= high_seed)
 
         dist = self.network.select('low_actor')(observation, sub_goal, temperature=temperature)
-        actions = dist.sample(seed= seed)
+        actions = dist.sample(seed= low_seed)
         actions = jnp.clip(actions, -1.0, 1.0)
 
         return actions
@@ -188,11 +192,13 @@ class HIQLAgent(flax.struct.PyTreeNode):
         high_actor_def = GCActor(
             hidden_layers=_cfg['actor_hidden_dims'],
             action_dim=state_dim,
+            const_std = _cfg["const_std"]
         )
 
         low_actor_def = GCActor(
             hidden_layers=_cfg['actor_hidden_dims'],
             action_dim=action_dim,
+            const_std = _cfg["const_std"]
         )
 
         value_def = GCValue(
@@ -214,6 +220,9 @@ class HIQLAgent(flax.struct.PyTreeNode):
         network_tx = optax.adam(learning_rate=_cfg['lr'])
         network_params = network_def.init(init_rng, **network_args)['params']
         network = TrainState.create(network_def, network_params, tx=network_tx)
+
+        params = network.params
+        params['modules_target_value'] = params['modules_value']
 
         return cls(rng, network=network, config=flax.core.FrozenDict(**_cfg))
     

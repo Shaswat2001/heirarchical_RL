@@ -38,13 +38,15 @@ class GCActor(nn.Module):
     final_fc_init_scale: float = 1e-2
     log_std_min: Optional[float] = -5
     log_std_max: Optional[float] = 0.0
+    const_std: bool = False
 
     def setup(self):
         
         self.actor_net = MLP(self.hidden_layers, activate_final= True, layer_norm= True)
         self.mean_net = nn.Dense(self.action_dim, kernel_init=default_init(self.final_fc_init_scale))
 
-        self.log_std_net = nn.Dense(self.action_dim, kernel_init=default_init(self.final_fc_init_scale))
+        if not self.const_std:
+            self.log_std_net = nn.Dense(self.action_dim, kernel_init=default_init(self.final_fc_init_scale))
     
     def __call__(self, observations, goal = None, temperature = 1.0):
         
@@ -55,7 +57,11 @@ class GCActor(nn.Module):
         outputs = self.actor_net(inputs)
 
         means = self.mean_net(outputs)
-        log_stds = self.log_std_net(outputs)
+
+        if self.const_std:
+            log_stds = jnp.zeros_like(means)
+        else:
+            log_stds = self.log_std_net(outputs)
         log_stds = jnp.clip(log_stds, self.log_std_min, self.log_std_max)
 
         distribution = distrax.MultivariateNormalDiag(loc=means, scale_diag=jnp.exp(log_stds) * temperature)

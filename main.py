@@ -149,7 +149,7 @@ if __name__ == "__main__":
 
     parser.add_argument('--run_group', type=str, default='Debug', help='Run group.')
     parser.add_argument('--seed', type=int, default=0, help='Random seed.')
-    parser.add_argument('--agents', type=str, default="gcbc", help='Agent to load.')
+    parser.add_argument('--agents', type=str, default="hbc", help='Agent to load.')
 
     # Environment
     parser.add_argument('--env_module', type=str, default='sai', help='Environment (dataset) name.')
@@ -167,10 +167,10 @@ if __name__ == "__main__":
     parser.add_argument('--offline_steps', type=int, default=10000000, help='Number of offline steps.')
     parser.add_argument('--log_interval', type=int, default=10000, help='Logging interval.')
     parser.add_argument('--eval_interval', type=int, default=250000, help='Evaluation interval.')
-    parser.add_argument('--save_interval', type=int, default=1000000, help='Saving interval.')
+    parser.add_argument('--save_interval', type=int, default=100000, help='Saving interval.')
 
     # Evaluation
-    parser.add_argument('--eval_episodes', type=int, default=51, help='Number of episodes for each task.')
+    parser.add_argument('--eval_episodes', type=int, default=4, help='Number of episodes for each task.')
     parser.add_argument('--eval_temperature', type=float, default=0, help='Actor temperature for evaluation.')
     parser.add_argument('--eval_gaussian', type=float, default=None, help='Action Gaussian noise for evaluation.')
     parser.add_argument('--eval_tasks', type=float, default=None, help='Number of tasks to evaluate (None for all).')
