@@ -51,7 +51,6 @@ def main(args):
         action = agent(observation=observation, goal=info["goal"], temperature=0.0)
         action = np.array(action)
         action[:-1] = action[:-1]* 0.01
-        print(action)
         observation, reward, terminated, truncated, info = env.step(action)
         rwd.append(reward)
         env.render()
@@ -77,8 +76,8 @@ if __name__ == "__main__":
     parser.add_argument('--env_name', type=str, default='FrankaIkGolfCourseEnv-v0', help='Environment (dataset) name.')
 
     # Save / restore
-    parser.add_argument('--restore_path', type=str, default='exp/hrl-arenaX/Debug/FrankaIkGolfCourseEnv_20250615-140715_hbc', help='Save directory.')
-    parser.add_argument('--restore_epoch', type=int, default=2700000, help='Epoch checkpoint.')
+    parser.add_argument('--restore_path', type=str, default='exp/hrl-arenaX/Debug/FrankaIkGolfCourseEnv_20250615-151248_hbc', help='Save directory.')
+    parser.add_argument('--restore_epoch', type=int, default=9300000, help='Epoch checkpoint.')
 
     args = parser.parse_args()
 
