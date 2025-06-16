@@ -43,14 +43,15 @@ def main(args):
     observation, info = env.reset(seed=42)
     rwd = []
 
-    with np.load(f'/home/ubuntu/uploads/heirarchical_RL/dataset/FrankaIkGolfCourseEnv-v0/train/filtered_data_20250603_193255.npz', allow_pickle=True) as data:
+    with np.load(f'/home/ubuntu/uploads/heirarchical_RL/dataset/FrankaGolfCourseEnv-v0/filtered_data_20250603_193255_joint.npz', allow_pickle=True) as data:
         train_data = {key: data[key] for key in data}
     print(np.linalg.norm(observation - info.get("goal")))
     i = 0
     while True:
         action = agent(observation=observation, goal=info["goal"], temperature=0.0)
         action = np.array(action)
-        action[:-1] = action[:-1]* 0.01
+        action[-1] *= 255
+        print(action)
         observation, reward, terminated, truncated, info = env.step(action)
         rwd.append(reward)
         env.render()
@@ -69,15 +70,15 @@ if __name__ == "__main__":
 
     parser.add_argument('--run_group', type=str, default='Debug', help='Run group.')
     parser.add_argument('--seed', type=int, default=0, help='Random seed.')
-    parser.add_argument('--agents', type=str, default="hbc", help='Agent to load.')
+    parser.add_argument('--agents', type=str, default="hiql", help='Agent to load.')
 
     # Environment
     parser.add_argument('--env_module', type=str, default='sai', help='Environment (dataset) name.')
-    parser.add_argument('--env_name', type=str, default='FrankaIkGolfCourseEnv-v0', help='Environment (dataset) name.')
+    parser.add_argument('--env_name', type=str, default='FrankaGolfCourseEnv-v0', help='Environment (dataset) name.')
 
     # Save / restore
-    parser.add_argument('--restore_path', type=str, default='exp/hrl-arenaX/Debug/FrankaIkGolfCourseEnv_20250615-151248_hbc', help='Save directory.')
-    parser.add_argument('--restore_epoch', type=int, default=9300000, help='Epoch checkpoint.')
+    parser.add_argument('--restore_path', type=str, default='exp/hrl-arenaX/Debug/FrankaGolfCourseEnv_20250616-034333_hiql', help='Save directory.')
+    parser.add_argument('--restore_epoch', type=int, default=100000, help='Epoch checkpoint.')
 
     args = parser.parse_args()
 

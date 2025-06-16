@@ -10,12 +10,12 @@ import sai_mujoco
 
 def main(args):
 
-    input_dir = "/Users/shaswatgarg/Documents/Job/ArenaX/Development/heirarchical_RL/dataset/FrankaIkGolfCourseEnv-v0/train"  # <-- change this
+    input_dir = "/home/ubuntu/uploads/heirarchical_RL/dataset/FrankaIkGolfCourseEnv-v0/train/"  # <-- change this
     env = gym.make(args.env_name, keyframe="init_frame")
     # List all .npz files in the folder
     npz_files = [f for f in os.listdir(input_dir) if f.endswith(".npz")]
     print(npz_files)
-    npz_files = ["FrankaIkGolfCourseEnv-v0_train_joint.npz"]
+    # npz_files = ["FrankaIkGolfCourseEnv-v0_train_joint.npz"]
     for filename in npz_files:
         filepath = os.path.join(input_dir, filename)
         ep = np.load(filepath, allow_pickle=True)
@@ -30,7 +30,7 @@ def main(args):
             action = ep["actions"][i]
             action = np.array(action)
             observation, reward, terminated, truncated, info = env.step(action)
-            joint_val = env.unwrapped.robot_model.data.ctrl.copy()
+            joint_val = info["joint_angles"].copy()
             joint_val[-1] = 1.0 if joint_val[-1] > 0 else 0.0
             joint_dataset["actions"].append(joint_val)
             done = ep["terminals"][i]
@@ -49,7 +49,7 @@ def main(args):
         # print(joint_dataset["terminals"].shape)
         # print(joint_dataset["observations"].shape)
         output_path = os.path.join(input_dir, f"{filename}_joint.npz")
-        # np.savez_compressed(output_path, **joint_dataset)
+        np.savez_compressed(output_path, **joint_dataset)
 
 if __name__ == "__main__":
 

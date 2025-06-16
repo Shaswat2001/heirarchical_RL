@@ -172,7 +172,7 @@ class HIQLAgent(flax.struct.PyTreeNode):
 
         dist = self.network.select('low_actor')(observation, sub_goal, temperature=temperature)
         actions = dist.sample(seed= low_seed)
-        actions = jnp.clip(actions, -1.0, 1.0)
+        actions = jnp.clip(actions, -2.7, 2.7)
 
         return actions
 

@@ -159,6 +159,7 @@ def evaluate_sai(
         while not done:
             action = actor_fn(observation=observation, goal=goal, temperature=eval_temperature)
             action = np.array(action)
+            action[-1] *= 255
             if not config.get('discrete'):
                 if eval_gaussian is not None:
                     action = np.random.normal(action, eval_gaussian)

@@ -37,7 +37,7 @@ class GCActor(nn.Module):
     action_dim: int
     final_fc_init_scale: float = 1e-2
     log_std_min: Optional[float] = -5
-    log_std_max: Optional[float] = 0.0
+    log_std_max: Optional[float] = 2.0
     const_std: bool = False
 
     def setup(self):

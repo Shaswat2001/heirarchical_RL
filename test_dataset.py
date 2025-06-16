@@ -16,53 +16,25 @@ from utils.flax_utils import save_agent, restore_agent
 def main(args):
 
     dir_name = os.path.dirname(os.path.realpath(__file__))
-    data = np.load(f'{dir_name}/dataset/FrankaIkGolfCourseEnv-v0/train/FrankaIkGolfCourseEnv-v0_train.npz', allow_pickle=True)
+    data = np.load("/home/ubuntu/uploads/heirarchical_RL/dataset/FrankaGolfCourseEnv-v0/train/FrankaGolfCourseEnv-v0_train.npz", allow_pickle=True)
 
     # List all arrays stored in the file
     print("Keys in the .npz file:", data.files)
 
     env = gym.make(args.env_name, keyframe="init_frame",render_mode="human")
     observation, info = env.reset(seed=42)
-    rwd = []
-
-    all_obs = []
-    all_actions = []
-    all_terminals = []
-
-    temp_obs = []
-    temp_actions = []
-    temp_terminals = []
-    
+    print(np.min(data["actions"]))
     for i in range(len(data["observations"])):
         action = data["actions"][i]
         action = np.array(action)
-
-        temp_obs.append(data["observations"][i])
-        temp_actions.append(data["actions"][i])
-        temp_terminals.append(data["terminals"][i])
+        action[-1] *= 255
 
         observation, reward, terminated, truncated, info = env.step(action)
         env.render()
 
         done = terminated or data["terminals"][i]
-        print(data["terminals"][i])
         if done:
-            user_input = input("Keep this trajectory? (y/n): ").strip().lower()
-            if user_input == 'y':
-                all_obs.extend(temp_obs)
-                all_actions.extend(temp_actions)
-                all_terminals.extend(temp_terminals)
-            # reset trajectory buffers
-            temp_obs, temp_actions, temp_terminals = [], [], []
             observation, info = env.reset()
-
-    output_path = f'{dir_name}/filtered_data.npz'
-    np.savez_compressed(
-        output_path,
-        observations=np.array(all_obs),
-        actions=np.array(all_actions),
-        terminals=np.array(all_terminals)
-    )
 
     env.close()
     
@@ -76,7 +48,7 @@ if __name__ == "__main__":
 
     # Environment
     parser.add_argument('--env_module', type=str, default='sai', help='Environment (dataset) name.')
-    parser.add_argument('--env_name', type=str, default='FrankaIkGolfCourseEnv-v0', help='Environment (dataset) name.')
+    parser.add_argument('--env_name', type=str, default='FrankaGolfCourseEnv-v0', help='Environment (dataset) name.')
 
     # Save / restore
     parser.add_argument('--save_dir', type=str, default='exp/', help='Save directory.')
