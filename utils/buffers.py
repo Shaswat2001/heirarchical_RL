@@ -119,7 +119,6 @@ class GCDataset:
             goal_idxs = idxs
         else:
 
-
             goal_idxs = np.where(
                 np.random.rand(batch_size) < p_trajgoal / (1.0 - p_curgoal), traj_goal_idxs, random_goal_idxs
             )
