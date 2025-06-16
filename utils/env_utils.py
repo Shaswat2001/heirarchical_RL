@@ -106,11 +106,11 @@ def make_sai_datasets(env_name):
 
     env = gymnasium.make(env_name, keyframe="init_frame")
 
-    with np.load(f'{dir_name}/dataset/{env_name}/filtered_data_20250603_193255_joint.npz', allow_pickle=True) as data:
+    with np.load(f'{dir_name}/dataset/{env_name}/filtered_data_20250604_140137_joint.npz', allow_pickle=True) as data:
         train_data = {key: data[key] for key in data}
 
-    with np.load(f'{dir_name}/dataset/{env_name}/val/{env_name}_val.npz', allow_pickle=True) as data:
-        val_data = {key: data[key] for key in data}
+    # with np.load(f'{dir_name}/dataset/{env_name}/val/{env_name}_val.npz', allow_pickle=True) as data:
+    #     val_data = {key: data[key] for key in data}
     
 
     # scaler = MinMaxScaler(feature_range=(-1, 1))
@@ -124,9 +124,9 @@ def make_sai_datasets(env_name):
     # val_data["actions"][:,:-1] = val_data["actions"][:,:-1] * 100
 
     train_dataset = Dataset.create(**train_data)
-    val_dataset = Dataset.create(**val_data)
+    # val_dataset = Dataset.create(**val_data)
 
-    return env, train_dataset, val_dataset
+    return env, train_dataset, None
 
 
 
