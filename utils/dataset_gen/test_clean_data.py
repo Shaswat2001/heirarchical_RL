@@ -9,21 +9,27 @@ import sai_mujoco
 def main(args):
 
     dir_name = os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
-    ep = np.load(f'{dir_name}/dataset/FrankaGolfCourseEnv-v0/{args.file_name}.npz', allow_pickle=True)
+    ep = np.load(f'{dir_name}/dataset/FrankaGolfCourseEnv-v0/{args.file_name}_final.npz', allow_pickle=True)
+    # ep = dict(ep)
+    # ep.pop('actions', None)  # avoids KeyError if the key doesn't exist
 
+    # # Rename a key
+    # ep['actions'] = ep.pop('joint_angles')
+    
+    # np.savez_compressed(
+    #     f'{dir_name}/dataset/FrankaGolfCourseEnv-v0/{args.file_name}_final.npz',
+    #     **ep
+    # )
     env = gym.make(args.env_name, keyframe="init_frame",render_mode="human")
     observation, info = env.reset(seed=42)
-    for i in range(len(ep["joint_angles"])):
-        action = ep["joint_angles"][i]
+    for i in range(len(ep["actions"])):
+        action = ep["actions"][i]
         action = np.array(action)
         action[-1] *= 255
         observation, reward, terminated, truncated, info = env.step(action)
         env.render()
 
         done = ep["terminals"][i]
-        print("epsiode state data: ", ep["observations"][i])
-        print("epsiode done data: ", ep["terminals"][i])
-        print("epsiode action data: ", ep["joint_angles"][i])
         if done:
             user_input = input("Keep this trajectory? (y/n): ").strip().lower()
             observation, info = env.reset()

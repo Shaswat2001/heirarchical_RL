@@ -43,7 +43,7 @@ def main(args):
     observation, info = env.reset(seed=42)
     rwd = []
 
-    with np.load(f'/home/ubuntu/uploads/heirarchical_RL/dataset/FrankaGolfCourseEnv-v0/filtered_data_20250603_193255_joint.npz', allow_pickle=True) as data:
+    with np.load(f'/home/ubuntu/uploads/heirarchical_RL/dataset/FrankaGolfCourseEnv-v0/filtered_data_20250604_140137_joint_final.npz', allow_pickle=True) as data:
         train_data = {key: data[key] for key in data}
     print(np.linalg.norm(observation - info.get("goal")))
     i = 0
@@ -77,8 +77,8 @@ if __name__ == "__main__":
     parser.add_argument('--env_name', type=str, default='FrankaGolfCourseEnv-v0', help='Environment (dataset) name.')
 
     # Save / restore
-    parser.add_argument('--restore_path', type=str, default='exp/hrl-arenaX/Debug/FrankaGolfCourseEnv_20250616-034333_hiql', help='Save directory.')
-    parser.add_argument('--restore_epoch', type=int, default=100000, help='Epoch checkpoint.')
+    parser.add_argument('--restore_path', type=str, default='exp/hrl-arenaX/Debug/FrankaGolfCourseEnv_20250616-192918_hiql', help='Save directory.')
+    parser.add_argument('--restore_epoch', type=int, default=2000000, help='Epoch checkpoint.')
 
     args = parser.parse_args()
 

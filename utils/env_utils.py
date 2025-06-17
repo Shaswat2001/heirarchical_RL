@@ -106,7 +106,7 @@ def make_sai_datasets(env_name):
 
     env = gymnasium.make(env_name, keyframe="init_frame")
 
-    with np.load(f'{dir_name}/dataset/{env_name}/filtered_data_20250604_140137_joint.npz', allow_pickle=True) as data:
+    with np.load(f'{dir_name}/dataset/{env_name}/filtered_data_20250604_140137_joint_final.npz', allow_pickle=True) as data:
         train_data = {key: data[key] for key in data}
 
     # with np.load(f'{dir_name}/dataset/{env_name}/val/{env_name}_val.npz', allow_pickle=True) as data:

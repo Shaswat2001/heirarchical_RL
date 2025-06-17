@@ -47,7 +47,8 @@ def main(args):
 
     buffer_class = buffers[agent_config["dataset_class"]]
     train_dataset = buffer_class(Dataset.create(**train_dataset),agent_config)
-    val_dataset = buffer_class(Dataset.create(**val_dataset),agent_config)
+    if val_dataset is not None:
+        val_dataset = buffer_class(Dataset.create(**val_dataset),agent_config)
     example_batch = train_dataset.sample(1)
 
     agent = agent_class.create(
