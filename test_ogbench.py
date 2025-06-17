@@ -53,17 +53,18 @@ def main(args):
     env_name = '-'.join(splits[:-2] + splits[-1:])
     agent = restore_agent(agent, args.restore_path, args.restore_epoch)
     agent = supply_rng(agent.get_actions, rng=jax.random.PRNGKey(np.random.randint(0, 2**32)))
-    env = gym.make(env_name)
+    env = gym.make(env_name, render_mode="rgb_array")
     observation, info = env.reset(options=dict(task_id=1, render_goal=True))
     rwd = []
     goal = info["goal"]
+    goal_frame = info.get('goal_rendered')
     i = 0
     while True:
         action = agent(observation=observation, goal=goal, temperature=0.0)
         action = np.array(action)
         observation, reward, terminated, truncated, info = env.step(action)
         frame = env.render().copy()
-        render.append(frame)
+        render.append(np.concatenate([goal_frame, frame], axis=0))
         rwd.append(reward)
         # env.render()
         if terminated or truncated:
@@ -89,7 +90,7 @@ if __name__ == "__main__":
     parser.add_argument('--env_name', type=str, default='antmaze-medium-navigate-v0', help='Environment (dataset) name.')
 
     # Save / restore
-    parser.add_argument('--restore_path', type=str, default='exp/hrl-arenaX/Debug/antmaze_20250614-230705_hiql', help='Save directory.')
+    parser.add_argument('--restore_path', type=str, default='exp/hrl-arenaX/Debug/antmaze_20250610-154126', help='Save directory.')
     parser.add_argument('--restore_epoch', type=int, default=900000, help='Epoch checkpoint.')
 
     args = parser.parse_args()
