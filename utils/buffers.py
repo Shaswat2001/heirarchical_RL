@@ -44,6 +44,14 @@ class Dataset(FrozenDict):
             result['next_observations'] = self._dict['observations'][np.minimum(idxs + 1, self.size - 1)]
         return result
     
+class HindsightReplayBuffer(Dataset):
+
+    pass
+
+class ReplayBuffer(Dataset):
+
+    pass
+    
 @dataclasses.dataclass
 class GCDataset:
 
