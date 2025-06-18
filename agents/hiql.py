@@ -14,13 +14,13 @@ HIQL_CONFIG_DICT = {
     "agent_name": 'hiql',  # Agent name.
     "lr": 1e-4,  # Learning rate.
     "batch_size": 1024,  # Batch size.
-    "actor_hidden_dims": (512, 512, 512),  # Actor network hidden dimensions.
-    "value_hidden_dims": (512, 512, 512),  # Value network hidden dimensions.
-    "beta": 3.0, # Temperature in AWR.
-    "layer_norm": True,  # Whether to use layer normalization.
+    "actor_hidden_dims": (256, 256),  # Actor network hidden dimensions.
+    "value_hidden_dims": (256, 256),  # Value network hidden dimensions.
+    "beta": 0.5, # Temperature in AWR.
+    "layer_norm": False,  # Whether to use layer normalization.
     "tau": 0.005,
     "expectile_tau": 0.7,  # IQL expectile.
-    "subgoal_step": 25, # step k to get subgoal
+    "subgoal_step": 40, # step k to get subgoal
     "discount": 0.99,  # Discount factor (unused by default; can be used for geometric goal sampling in GCDataset).
     "const_std": False,  # Whether to use constant standard deviation for the actor.
     "discrete": False,  # Whether the action space is discrete.

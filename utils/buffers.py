@@ -184,7 +184,6 @@ class HGCDataset(GCDataset):
         pick_random = np.random.rand(batch_size) < self.config['actor_p_randomgoal']
         high_goal_idxs = np.where(pick_random, high_level_random_goals_idxs, high_level_traj_goal_idxs)
         high_target_idxs = np.where(pick_random, high_level_random_targets_idxs, high_level_target_idxs)
-
         batch['high_actor_goals'] = self.get_observations(high_goal_idxs)
         batch['high_actor_targets'] = self.get_observations(high_target_idxs)
 
