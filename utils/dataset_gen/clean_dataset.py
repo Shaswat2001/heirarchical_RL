@@ -9,7 +9,7 @@ import sai_mujoco
 def main(args):
 
     dir_name = os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
-    folder = "20250604_140137"
+    folder = "20250603_193255"
     data = np.load(f'/Users/shaswatgarg/Downloads/data/train/FrankaIkGolfCourseEnv-v0/{folder}/episodes.npy', allow_pickle=True)
 
     env = gym.make(args.env_name, keyframe="init_frame",render_mode="human")
@@ -63,8 +63,8 @@ def main(args):
     np.savez_compressed(
         output_path,
         observations=np.array(all_obs, dtype=np.float32),
-        actions=np.array(all_actions, dtype=np.float32),
-        joint_angles=np.array(all_joint_angles, dtype=np.float32),
+        actions=np.array(all_joint_angles, dtype=np.float32),
+        # joint_angles=np.array(all_joint_angles, dtype=np.float32),
         terminals=np.array(all_terminals, dtype=bool)
     )
 

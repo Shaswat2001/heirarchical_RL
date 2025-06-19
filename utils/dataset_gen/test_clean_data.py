@@ -9,17 +9,8 @@ import sai_mujoco
 def main(args):
 
     dir_name = os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
-    ep = np.load(f'{dir_name}/dataset/FrankaGolfCourseEnv-v0/{args.file_name}_final.npz', allow_pickle=True)
-    # ep = dict(ep)
-    # ep.pop('actions', None)  # avoids KeyError if the key doesn't exist
+    ep = np.load(f'{dir_name}/dataset/FrankaGolfCourseEnv-v0/train/FrankaGolfCourseEnv-v0_train.npz', allow_pickle=True)
 
-    # # Rename a key
-    # ep['actions'] = ep.pop('joint_angles')
-    
-    # np.savez_compressed(
-    #     f'{dir_name}/dataset/FrankaGolfCourseEnv-v0/{args.file_name}_final.npz',
-    #     **ep
-    # )
     env = gym.make(args.env_name, keyframe="init_frame",render_mode="human")
     observation, info = env.reset(seed=42)
     for i in range(len(ep["actions"])):

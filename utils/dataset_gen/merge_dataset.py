@@ -1,7 +1,7 @@
 import os
 import numpy as np
 
-input_dir = "/Users/shaswatgarg/Documents/Job/ArenaX/Development/heirarchical_RL/dataset/FrankaIkGolfCourseEnv-v0"  # <-- change this
+input_dir = "/Users/shaswatgarg/Documents/Job/ArenaX/Development/heirarchical_RL/dataset/FrankaGolfCourseEnv-v0"  # <-- change this
 merged_data = {}
 
 # List all .npz files in the folder
@@ -28,7 +28,7 @@ for key in merged_data:
         merged_data[key] = np.concatenate(merged_data[key], axis=0, dtype=np.float32)
 # Save to a single merged .npz file
 print(len(merged_data["observations"]))
-output_path = os.path.join(input_dir, "merged_dataset.npz")
+output_path = os.path.join(input_dir, "train/FrankaGolfCourseEnv-v0_train.npz")
 np.savez_compressed(output_path, **merged_data)
 
 print(f"Merged {len(npz_files)} files. Keys: {list(merged_data.keys())}")
