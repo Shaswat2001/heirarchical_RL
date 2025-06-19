@@ -31,7 +31,7 @@ HBC_CONFIG_DICT = {
     "actor_p_randomgoal": 0.3,  # Probability of using a random state as the actor goal.
     "actor_geom_sample": True,  # Whether to use geometric sampling for future actor goals.
     "gc_negative": True,  # Unused (defined for compatibility with GCDataset).
-    "bc_method": "mse"
+    "bc_method": "logprob"
 }
 
 class HBCAgent(flax.struct.PyTreeNode):
@@ -144,7 +144,7 @@ class HBCAgent(flax.struct.PyTreeNode):
         else:
             dist = self.network.select('low_actor')(observation, sub_goal, temperature=temperature)
             actions = dist.sample(seed= low_seed)
-            actions = jnp.clip(actions, -1.0, 1.0)
+            actions = jnp.clip(actions, -2.7, 2.7)
 
         return actions
 
