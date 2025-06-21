@@ -4,3 +4,4 @@
 /utils/__pycache__
 /trainers/__pycache__
 /exp/
+.DS_Store
