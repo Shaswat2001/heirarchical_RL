@@ -19,6 +19,7 @@ GCIQL_CONFIG_DICT = {
     "beta": 0.3, # Temperature in AWR.
     "layer_norm": True,  # Whether to use layer normalization.
     "tau": 0.005,
+    "clip_threshold": 100,
     "expectile_tau": 0.9,  # IQL expectile.
     "discount": 0.99,  # Discount factor (unused by default; can be used for geometric goal sampling in GCDataset).
     "const_std": True,  # Whether to use constant standard deviation for the actor.
@@ -50,7 +51,7 @@ class GCIQLAgent(flax.struct.PyTreeNode):
     @jax.jit
     def value_loss(self, batch, grad_params):
         
-        target_q = self.network.select("target_critic")(batch["observations"], batch["value_goals"], batch["actions"], params=grad_params)
+        target_q = self.network.select("target_critic")(batch["observations"], batch["value_goals"], batch["actions"])
         v = self.network.select("value")(batch["observations"], batch["value_goals"], params=grad_params)
 
         value_loss = self.expectile_loss(target_q - v, self.config["expectile_tau"]).mean()
@@ -67,7 +68,7 @@ class GCIQLAgent(flax.struct.PyTreeNode):
     @jax.jit
     def critic_loss(self, batch, grad_params):
 
-        q = self.network.select("critic")(batch["observations"], batch["value_goals"], batch["actions"], params= grad_params)
+        q = self.network.select("critic")(batch["observations"], batch["value_goals"], batch["actions"])
         target_v = self.network.select("value")(batch["observations"], batch["value_goals"], params= grad_params)
 
         target_q = batch["rewards"] + self.config["discount"]*batch["masks"]*target_v
@@ -86,8 +87,8 @@ class GCIQLAgent(flax.struct.PyTreeNode):
     @jax.jit
     def actor_loss(self, batch, grad_params, rng=None):
 
-        v = self.network.select("value")(batch["observations"], batch["actor_goals"], params=grad_params)
-        q = self.network.select("critic")(batch["observations"], batch["actor_goals"], batch["actions"],params=grad_params)
+        v = self.network.select("value")(batch["observations"], batch["actor_goals"])
+        q = self.network.select("critic")(batch["observations"], batch["actor_goals"], batch["actions"])
 
         adv = q - v
         exp_adv = jnp.minimum(jnp.exp(self.config["beta"]*adv),100)
@@ -155,7 +156,7 @@ class GCIQLAgent(flax.struct.PyTreeNode):
 
         dist = self.network.select('actor')(observation, goal, temperature=temperature)
         actions = dist.sample(seed= seed)
-        actions = jnp.clip(actions, -1.0, 1.0)
+        actions = jnp.clip(actions, -2.7, 2.7)
 
         return actions
 
@@ -199,7 +200,11 @@ class GCIQLAgent(flax.struct.PyTreeNode):
         network_args = {k: v[1] for k,v in network_info.items()}
 
         network_def = ModuleDict(network)
-        network_tx = optax.adam(learning_rate=_cfg['lr'])
+        # network_tx = optax.adam(learning_rate=_cfg['lr'])
+        network_tx = optax.chain(
+            optax.clip_by_global_norm(_cfg['clip_threshold']),
+            optax.adam(_cfg['lr'])
+        )
         network_params = network_def.init(init_rng, **network_args)['params']
         network = TrainState.create(network_def, network_params, tx=network_tx)
 

@@ -150,7 +150,7 @@ if __name__ == "__main__":
 
     parser.add_argument('--run_group', type=str, default='Debug', help='Run group.')
     parser.add_argument('--seed', type=int, default=0, help='Random seed.')
-    parser.add_argument('--agents', type=str, default="hbc", help='Agent to load.')
+    parser.add_argument('--agents', type=str, default="gciql", help='Agent to load.')
 
     # Environment
     parser.add_argument('--env_module', type=str, default='sai', help='Environment (dataset) name.')
