@@ -60,15 +60,15 @@ class RISAgent(flax.struct.PyTreeNode):
 
     def critic_loss(self, batch, grad_params, rng = None):
 
-        q = self.network.select("critic")(batch["observations"], batch["value_goals"], batch["actions"], params = grad_params)
+        q = self.network.select("critic")(batch["observations"], batch["value_goals"], batch["actions"], params = grad_params).squeeze(-1)
         distribution = self.network.select("low_actor")(batch["next_observations"], batch["value_goals"])
-        distribution = jax.lax.stop_gradient(distribution)
         next_action, _, _ = self.sample(distribution, rng)
         target = self.network.select("target_critic")(batch["next_observations"], batch["value_goals"], next_action)
-        target_q = batch["rewards"] + self.config["discount"]*batch["masks"]*target
-        
+        target_q = batch["rewards"] + self.config["discount"]*batch["masks"]*target.squeeze(-1)
+        # jax.debug.print("Q: {}", q.squeeze(-1))
+        # jax.debug.print("Target Q: {}", target_q)
         critic_loss = ((target_q - q)**2).mean()
-        # jax.debug.print("Critic Loss: {}", critic_loss)
+        jax.debug.print("Critic Loss: {}", critic_loss)
         critic_info = {
             "critic_loss" :  critic_loss,
             "q_mean" : q.mean(),
@@ -101,10 +101,9 @@ class RISAgent(flax.struct.PyTreeNode):
         v_2 = value(batch['high_actor_targets'], batch['high_actor_goals'])
         v = jnp.maximum(v_1, v_2)
         adv = - (v - policy_v)
+
         weight = flax.linen.softmax(adv/self.config["lambda"], axis=0).squeeze(-1)
-
         log_prob = dist.log_prob(batch['high_actor_targets']).sum(-1)
-
         actor_loss = - (log_prob * weight).mean()
 
         actor_info = {
@@ -120,7 +119,7 @@ class RISAgent(flax.struct.PyTreeNode):
     def low_actor_loss(self, batch, grad_params, rng=None):
 
         dist = self.network.select('low_actor')(batch['observations'], batch['low_level_actor_goals'], params = grad_params)
-        actions, log_prob = dist.sample_and_log_prob(seed=rng)
+        actions = dist.sample(seed=rng)
         
         actions_tanh = jnp.tanh(actions)
 
@@ -135,7 +134,7 @@ class RISAgent(flax.struct.PyTreeNode):
             repeat_goal = jnp.repeat(goal[:, None, :], num_subgoals, axis=1)
             flat_state = repeat_state.reshape(-1, state.shape[-1])
             flat_goal = repeat_goal.reshape(-1, goal.shape[-1])
-            dist = self.network.select("high_actor")(flat_state, flat_goal, params=grad_params)
+            dist = self.network.select("high_actor")(flat_state, flat_goal)
             subgoals = dist.sample(seed = rng)
             return subgoals.reshape(state.shape[0], num_subgoals, -1)
     
@@ -146,7 +145,7 @@ class RISAgent(flax.struct.PyTreeNode):
         expanded_obs = jnp.repeat(batch["observations"][:, None, :], num_subgoals, axis=1)
         flat_obs = expanded_obs.reshape(batch_size * num_subgoals, -1)
         flat_subgoals = subgoals.reshape(batch_size * num_subgoals, -1)
-        prior_dists = self.network.select("target_low_actor")(flat_obs, flat_subgoals, params=grad_params)
+        prior_dists = self.network.select("target_low_actor")(flat_obs, flat_subgoals)
         expanded_actions = jnp.repeat(actions[:, None, :], num_subgoals, axis=1)
         flat_actions = expanded_actions.reshape(-1, expanded_actions.shape[-1])
         
@@ -155,16 +154,14 @@ class RISAgent(flax.struct.PyTreeNode):
         prior_log_prob_mean = jnp.log(prior_log_probs.mean(1) + self.config["epsilon"])
         # jax.debug.print("Prior value: {}", prior_log_probs)
         # KL divergence: log π(a|s,g) - log π_prior(a|s,g)
-        kl_div = log_prob.sum(-1) - prior_log_prob_mean
+        kl_div = dist.log_prob(actions).sum(-1) - prior_log_prob_mean
         # jax.debug.print("KL divergence: {}", kl_div.shape)
         # jax.debug.print("Q val: {}", q_val[:,0].shape)
         # Final actor loss
-        actor_loss = -jnp.mean(q_val[:,0] - self.config["alpha"] * kl_div)
+        actor_loss = -jnp.mean(q_val.squeeze(-1) - self.config["alpha"] * kl_div)
         # jax.debug.print("Actor loss: {}", actor_loss)
         actor_info = {
             'actor_loss': actor_loss,
-            'bc_log_prob': log_prob.mean(),
-            'mse': jnp.mean((dist.mode() - batch['actions']) ** 2),
             'std': jnp.mean(dist.scale),
         }
 
