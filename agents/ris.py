@@ -3,6 +3,7 @@ import flax.linen
 import jax
 import flax
 import optax
+import numpy as np
 import jax.numpy as jnp
 
 import copy
@@ -57,17 +58,17 @@ class RISAgent(flax.struct.PyTreeNode):
         mean = jnp.tanh(distribution.mean())
         return action, log_prob, mean
 
-    @jax.jit
     def critic_loss(self, batch, grad_params, rng = None):
 
         q = self.network.select("critic")(batch["observations"], batch["value_goals"], batch["actions"], params = grad_params)
-        distribution = self.network.select("low_actor")(batch["next_observations"], batch["low_level_actor_goals"])
+        distribution = self.network.select("low_actor")(batch["next_observations"], batch["value_goals"])
+        distribution = jax.lax.stop_gradient(distribution)
         next_action, _, _ = self.sample(distribution, rng)
         target = self.network.select("target_critic")(batch["next_observations"], batch["value_goals"], next_action)
         target_q = batch["rewards"] + self.config["discount"]*batch["masks"]*target
-
+        
         critic_loss = ((target_q - q)**2).mean()
-
+        # jax.debug.print("Critic Loss: {}", critic_loss)
         critic_info = {
             "critic_loss" :  critic_loss,
             "q_mean" : q.mean(),
@@ -82,14 +83,15 @@ class RISAgent(flax.struct.PyTreeNode):
         def value(state, goal):
             distribution = self.network.select("low_actor")(state, goal)
             _, _, action = self.sample(distribution, rng)
-            V = self.network.select("critic")(state, action, goal)
+            V = self.network.select("critic")(state, goal, action)
             V = jnp.abs(jnp.clip(V, min = -100.0, max = 0.0))
             return V
         
         dist = self.network.select("high_actor")(batch["observations"], batch['high_actor_goals'], params=grad_params)
 
         # Compute target value
-        new_subgoal = dist.loc
+        dist_no_grad = jax.lax.stop_gradient(dist)
+        new_subgoal = dist_no_grad.loc
         policy_v_1 = value(batch["observations"], new_subgoal)
         policy_v_2 = value(new_subgoal, batch['high_actor_goals'])
         policy_v = jnp.maximum(policy_v_1, policy_v_2)
@@ -99,9 +101,10 @@ class RISAgent(flax.struct.PyTreeNode):
         v_2 = value(batch['high_actor_targets'], batch['high_actor_goals'])
         v = jnp.maximum(v_1, v_2)
         adv = - (v - policy_v)
-        weight = flax.linen.softmax(adv/self.config["lambda"], axis=0)
+        weight = flax.linen.softmax(adv/self.config["lambda"], axis=0).squeeze(-1)
 
         log_prob = dist.log_prob(batch['high_actor_targets']).sum(-1)
+
         actor_loss = - (log_prob * weight).mean()
 
         actor_info = {
@@ -123,7 +126,7 @@ class RISAgent(flax.struct.PyTreeNode):
 
         # Q-value estimate
         q_val = self.network.select("critic")(
-            batch["observations"], batch["value_goals"], actions_tanh, params=grad_params
+            batch["observations"], batch['low_level_actor_goals'], actions_tanh, params=grad_params
         )
 
         def sample_subgoals(state, goal, rng, num_subgoals=4):
@@ -143,19 +146,21 @@ class RISAgent(flax.struct.PyTreeNode):
         expanded_obs = jnp.repeat(batch["observations"][:, None, :], num_subgoals, axis=1)
         flat_obs = expanded_obs.reshape(batch_size * num_subgoals, -1)
         flat_subgoals = subgoals.reshape(batch_size * num_subgoals, -1)
-        prior_dists = self.network.select("low_actor")(flat_obs, flat_subgoals, params=grad_params)
+        prior_dists = self.network.select("target_low_actor")(flat_obs, flat_subgoals, params=grad_params)
         expanded_actions = jnp.repeat(actions[:, None, :], num_subgoals, axis=1)
         flat_actions = expanded_actions.reshape(-1, expanded_actions.shape[-1])
-
-        prior_log_probs = prior_dists.log_prob(flat_actions).reshape(batch_size, num_subgoals, -1).sum(-1)
+        
+        # jax.debug.print("Next action: {}", flat_actions.shape)
+        prior_log_probs = jnp.exp(prior_dists.log_prob(flat_actions).reshape(batch_size, num_subgoals, -1).sum(-1))
         prior_log_prob_mean = jnp.log(prior_log_probs.mean(1) + self.config["epsilon"])
-
+        # jax.debug.print("Prior value: {}", prior_log_probs)
         # KL divergence: log π(a|s,g) - log π_prior(a|s,g)
         kl_div = log_prob.sum(-1) - prior_log_prob_mean
-
+        # jax.debug.print("KL divergence: {}", kl_div.shape)
+        # jax.debug.print("Q val: {}", q_val[:,0].shape)
         # Final actor loss
-        actor_loss = -jnp.mean(q_val - self.config["alpha"] * kl_div[:, None])
-
+        actor_loss = -jnp.mean(q_val[:,0] - self.config["alpha"] * kl_div)
+        # jax.debug.print("Actor loss: {}", actor_loss)
         actor_info = {
             'actor_loss': actor_loss,
             'bc_log_prob': log_prob.mean(),
@@ -186,7 +191,7 @@ class RISAgent(flax.struct.PyTreeNode):
         for k, v in low_actor_info.items():
             info[f'low_actor/{k}'] = v
 
-        loss = low_actor_loss + critic_loss + high_actor_loss
+        loss = low_actor_loss + high_actor_loss +  critic_loss
         return loss, info
     
     def update_target_network(self, network, function_name):
@@ -208,6 +213,7 @@ class RISAgent(flax.struct.PyTreeNode):
 
         new_network, info = self.network.apply_loss_fn(loss_fn=loss_fn)
         self.update_target_network(new_network, "critic")
+        self.update_target_network(new_network, "low_actor")
 
         return self.replace(network=new_network, rng=new_rng), info
 
@@ -249,6 +255,8 @@ class RISAgent(flax.struct.PyTreeNode):
             const_std = _cfg["const_std"]
         )
 
+        target_low_actor_def = copy.deepcopy(low_actor_def)
+
         critic_def = GCValue(
             hidden_layers=_cfg["value_hidden_dims"],
             layer_norm=_cfg["layer_norm"]
@@ -259,6 +267,7 @@ class RISAgent(flax.struct.PyTreeNode):
         network_info = dict(
             high_actor=(high_actor_def, (ex_observations, ex_observations)),
             low_actor=(low_actor_def, (ex_observations, ex_observations)),
+            target_low_actor=(target_low_actor_def, (ex_observations, ex_observations)),
             critic=(critic_def, (ex_observations, ex_observations, ex_actions)),
             target_critic=(target_critic_def, (ex_observations, ex_observations, ex_actions))
         )
@@ -273,6 +282,7 @@ class RISAgent(flax.struct.PyTreeNode):
 
         params = network.params
         params['modules_target_critic'] = params['modules_critic']
+        params['modules_target_low_actor'] = params['modules_low_actor']
 
         return cls(rng, network=network, config=flax.core.FrozenDict(**_cfg))
     
