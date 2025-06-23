@@ -153,8 +153,8 @@ if __name__ == "__main__":
     parser.add_argument('--agents', type=str, default="gciql", help='Agent to load.')
 
     # Environment
-    parser.add_argument('--env_module', type=str, default='sai', help='Environment (dataset) name.')
-    parser.add_argument('--env_name', type=str, default='FrankaGolfCourseEnv-v0', help='Environment (dataset) name.')
+    parser.add_argument('--env_module', type=str, default='ogbench', help='Environment (dataset) name.')
+    parser.add_argument('--env_name', type=str, default='antmaze-medium-navigate-v0', help='Environment (dataset) name.')
     parser.add_argument('--dataset_dir', type=str, default="~/.ogbench/data", help='Dataset directory.')
     parser.add_argument('--dataset_replace_interval', type=int, default=1000, help='Dataset replace interval.')
     parser.add_argument('--num_datasets', type=int, default=None, help='Number of datasets to use.')

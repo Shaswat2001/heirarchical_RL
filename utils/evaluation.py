@@ -82,7 +82,7 @@ def evaluate(
             if not config.get('discrete'):
                 if eval_gaussian is not None:
                     action = np.random.normal(action, eval_gaussian)
-                action = np.clip(action, -2.7, 2.7)
+                action = np.clip(action, -1.0, 1.0)
 
             next_observation, reward, terminated, truncated, info = env.step(action)
             done = terminated or truncated
@@ -163,8 +163,7 @@ def evaluate_sai(
             if not config.get('discrete'):
                 if eval_gaussian is not None:
                     action = np.random.normal(action, eval_gaussian)
-                action = np.clip(action, -2.7, 2.7)
-
+                action = np.clip(action, -1.0, 1.0)
             next_observation, reward, terminated, truncated, info = env.step(action)
             done = terminated or truncated
             step += 1

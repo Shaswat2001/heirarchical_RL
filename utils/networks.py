@@ -67,6 +67,91 @@ class GCActor(nn.Module):
         distribution = distrax.MultivariateNormalDiag(loc=means, scale_diag=jnp.exp(log_stds) * temperature)
         return distribution
     
+class GCTanhGaussianActor(nn.Module):
+
+    hidden_layers: Sequence[int]
+    action_dim: int
+    final_fc_init_scale: float = 1e-2
+    log_std_min: Optional[float] = -5
+    log_std_max: Optional[float] = 2.0
+    const_std: bool = False
+
+    def setup(self):
+        
+        self.actor_net = MLP(self.hidden_layers, activate_final= True, layer_norm= True)
+        self.mean_net = nn.Dense(self.action_dim, kernel_init=default_init(self.final_fc_init_scale))
+
+        if not self.const_std:
+            self.log_std_net = nn.Dense(self.action_dim, kernel_init=default_init(self.final_fc_init_scale))
+    
+    def __call__(self, observations, goal = None, temperature = 1.0):
+        
+        inputs = [observations]
+        if goal is not None:
+            inputs.append(goal)
+        inputs = jnp.concatenate(inputs, axis=-1)
+        outputs = self.actor_net(inputs)
+
+        means = self.mean_net(outputs)
+
+        if self.const_std:
+            log_stds = jnp.zeros_like(means)
+        else:
+            log_stds = self.log_std_net(outputs)
+
+        log_stds = jnp.clip(log_stds, self.log_std_min, self.log_std_max)
+
+        distribution = distrax.Normal(loc=means, scale_diag=jnp.exp(log_stds) * temperature)
+        return distribution
+    
+    def sample(self, observations, goal = None, temperature = 1.0):
+
+        distribution = self(observations, goal, temperature)
+        x_t = distribution._sample_n()
+        action = jnp.tanh(x_t)
+        log_prob = distribution.log_prob(x_t)
+        log_prob -= jnp.log((1 - action.pow(2)) + 1e-6)
+        log_prob = log_prob.sum(-1, keepdim=True)
+        mean = jnp.tanh(distribution.mean())
+        return action, log_prob, mean
+    
+class GCLaplaceActor(nn.Module):
+
+    hidden_layers: Sequence[int]
+    action_dim: int
+    final_fc_init_scale: float = 1e-2
+    log_std_min: Optional[float] = -5
+    log_std_max: Optional[float] = 2.0
+    const_std: bool = False
+
+    def setup(self):
+        
+        self.actor_net = MLP(self.hidden_layers, activate_final= True, layer_norm= True)
+        self.mean_net = nn.Dense(self.action_dim, kernel_init=default_init(self.final_fc_init_scale))
+
+        if not self.const_std:
+            self.log_std_net = nn.Dense(self.action_dim, kernel_init=default_init(self.final_fc_init_scale))
+    
+    def __call__(self, observations, goal = None, temperature = 1.0):
+        
+        inputs = [observations]
+        if goal is not None:
+            inputs.append(goal)
+        inputs = jnp.concatenate(inputs, axis=-1)
+        outputs = self.actor_net(inputs)
+
+        means = self.mean_net(outputs)
+
+        if self.const_std:
+            log_stds = jnp.zeros_like(means)
+        else:
+            log_stds = self.log_std_net(outputs)
+
+        log_stds = jnp.clip(log_stds, self.log_std_min, self.log_std_max)
+
+        distribution = distrax.Laplace(loc=means, scale_diag=jnp.exp(log_stds) * temperature)
+        return distribution
+    
 class GCDetActor(nn.Module):
 
     hidden_layers: Sequence[int]

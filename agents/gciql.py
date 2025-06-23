@@ -156,7 +156,7 @@ class GCIQLAgent(flax.struct.PyTreeNode):
 
         dist = self.network.select('actor')(observation, goal, temperature=temperature)
         actions = dist.sample(seed= seed)
-        actions = jnp.clip(actions, -2.7, 2.7)
+        actions = jnp.clip(actions, -1.0, 1.0)
 
         return actions
 
