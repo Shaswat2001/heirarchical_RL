@@ -101,19 +101,8 @@ class GCTanhGaussianActor(nn.Module):
 
         log_stds = jnp.clip(log_stds, self.log_std_min, self.log_std_max)
 
-        distribution = distrax.Normal(loc=means, scale_diag=jnp.exp(log_stds) * temperature)
+        distribution = distrax.Normal(loc=means, scale=jnp.exp(log_stds) * temperature)
         return distribution
-    
-    def sample(self, observations, goal = None, temperature = 1.0):
-
-        distribution = self(observations, goal, temperature)
-        x_t = distribution._sample_n()
-        action = jnp.tanh(x_t)
-        log_prob = distribution.log_prob(x_t)
-        log_prob -= jnp.log((1 - action.pow(2)) + 1e-6)
-        log_prob = log_prob.sum(-1, keepdim=True)
-        mean = jnp.tanh(distribution.mean())
-        return action, log_prob, mean
     
 class GCLaplaceActor(nn.Module):
 
@@ -149,7 +138,7 @@ class GCLaplaceActor(nn.Module):
 
         log_stds = jnp.clip(log_stds, self.log_std_min, self.log_std_max)
 
-        distribution = distrax.Laplace(loc=means, scale_diag=jnp.exp(log_stds) * temperature)
+        distribution = distrax.Laplace(loc=means, scale=jnp.exp(log_stds) * temperature)
         return distribution
     
 class GCDetActor(nn.Module):
