@@ -119,10 +119,10 @@ class GCDataset:
         else:
             # Uniform sampling.
             distances = np.random.rand(batch_size)  # in [0, 1)
-            traj_goal_idxs = np.round(
-                (np.minimum(idxs + 1, final_state_idxs) * distances + final_state_idxs * (1 - distances))
-            ).astype(int)
-            # traj_goal_idxs = np.round(np.minimum(idxs + 1, final_state_idxs))
+            # traj_goal_idxs = np.round(
+            #     (np.minimum(idxs + 1, final_state_idxs) * distances + final_state_idxs * (1 - distances))
+            # ).astype(int)
+            traj_goal_idxs = np.round(np.minimum(idxs + 4, final_state_idxs))
         if p_curgoal == 1.0:
             goal_idxs = idxs
         else:

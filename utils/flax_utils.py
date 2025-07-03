@@ -9,9 +9,37 @@ import flax
 import glob
 import optax
 import flax.linen as nn
+import tensorflow as tf
 import jax.numpy as jnp
+from jax.experimental import jax2tf
 
 nonpytree_field = functools.partial(flax.struct.field, pytree_node=False)
+
+def save_agent_as_tf(agent, save_dir: str, epoch: int):
+    """Save the Flax/JAX agent as a TensorFlow SavedModel.
+
+    Args:
+        agent: A `TrainState` instance containing the model and parameters.
+        save_dir: Base directory where model will be saved.
+        epoch: Epoch number used to name the export subdirectory.
+    """
+    export_dir = os.path.join(save_dir, f"tf_model_{epoch}")
+
+    # Sample dummy input (can also be passed explicitly)
+    param_leaves = jax.tree_util.tree_leaves(agent.network.params)
+    sample_param = param_leaves[0]
+    dummy_input = jnp.zeros((1,) + sample_param.shape[1:], dtype=sample_param.dtype)
+    
+    def apply_fn(x):
+        return agent.apply_fn({'params': agent.params}, x)
+
+    tf_func = tf.function(jax2tf.convert(apply_fn, enable_xla=True), input_signature=[tf.TensorSpec(dummy_input.shape, tf.float32)])
+
+    tf_module = tf.Module()
+    tf_module.predict = tf_func
+
+    tf.saved_model.save(tf_module, export_dir)
+    print(f"TensorFlow model saved to {export_dir}")
 
 class ModuleDict(nn.Module):
     """A dictionary of modules.

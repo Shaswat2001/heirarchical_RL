@@ -1,5 +1,6 @@
 
 import flax.linen
+import flax.linen
 import jax
 import flax
 import optax
@@ -90,8 +91,7 @@ class RISAgent(flax.struct.PyTreeNode):
         dist = self.network.select("high_actor")(batch["observations"], batch['high_actor_goals'], params=grad_params)
 
         # Compute target value
-        dist_no_grad = jax.lax.stop_gradient(dist)
-        new_subgoal = dist_no_grad.loc
+        new_subgoal = dist.loc
         policy_v_1 = value(batch["observations"], new_subgoal)
         policy_v_2 = value(new_subgoal, batch['high_actor_goals'])
         policy_v = jnp.maximum(policy_v_1, policy_v_2)
@@ -148,15 +148,22 @@ class RISAgent(flax.struct.PyTreeNode):
         prior_dists = self.network.select("target_low_actor")(flat_obs, flat_subgoals)
         expanded_actions = jnp.repeat(actions[:, None, :], num_subgoals, axis=1)
         flat_actions = expanded_actions.reshape(-1, expanded_actions.shape[-1])
-        
-        # jax.debug.print("Next action: {}", flat_actions.shape)
-        prior_log_probs = jnp.exp(prior_dists.log_prob(flat_actions).reshape(batch_size, num_subgoals, -1).sum(-1))
-        prior_log_prob_mean = jnp.log(prior_log_probs.mean(1) + self.config["epsilon"])
+
+        log_probs = prior_dists.log_prob(flat_actions)
+        log_probs = log_probs.reshape(batch_size, num_subgoals, -1).sum(1)
+        jax.debug.print("Actor loss: {}", log_probs.shape)
+        # prior_log_prob_mean = jax.scipy.special.logsumexp(log_probs, axis=1) - jnp.log(num_subgoals)
+        prior_log_prob_mean = jax.lax.stop_gradient(log_probs)
         # jax.debug.print("Prior value: {}", prior_log_probs)
         # KL divergence: log π(a|s,g) - log π_prior(a|s,g)
-        kl_div = dist.log_prob(actions).sum(-1) - prior_log_prob_mean
-        # jax.debug.print("KL divergence: {}", kl_div.shape)
-        # jax.debug.print("Q val: {}", q_val[:,0].shape)
+        log_prob = dist.log_prob(actions)
+        # log_det_jacobian = 2 * (jnp.log(2) - actions - flax.linen.softplus(-2 * actions)).sum(-1)
+        # log_prob_corrected = log_prob - log_det_jacobian
+        kl_div = (log_prob - prior_log_prob_mean).sum(-1)
+
+        jax.debug.print("KL divergence: {}", kl_div.shape)
+        jax.debug.print("Q val: {}", kl_div)
+        jax.debug.print("Q val: {}", q_val)
         # Final actor loss
         actor_loss = -jnp.mean(q_val.squeeze(-1) - self.config["alpha"] * kl_div)
         # jax.debug.print("Actor loss: {}", actor_loss)
@@ -188,7 +195,7 @@ class RISAgent(flax.struct.PyTreeNode):
         for k, v in low_actor_info.items():
             info[f'low_actor/{k}'] = v
 
-        loss = low_actor_loss + high_actor_loss +  critic_loss
+        loss = low_actor_loss + high_actor_loss + critic_loss
         return loss, info
     
     def update_target_network(self, network, function_name):
@@ -273,7 +280,11 @@ class RISAgent(flax.struct.PyTreeNode):
         network_args = {k: v[1] for k,v in network_info.items()}
 
         network_def = ModuleDict(network)
-        network_tx = optax.adam(learning_rate=_cfg['lr'])
+        network_tx = optax.chain(
+                optax.clip_by_global_norm(1.0),
+                optax.adam(learning_rate=_cfg['lr'])
+            )
+        # network_tx = optax.adam(learning_rate=_cfg['lr'])
         network_params = network_def.init(init_rng, **network_args)['params']
         network = TrainState.create(network_def, network_params, tx=network_tx)
 

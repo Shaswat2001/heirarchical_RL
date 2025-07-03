@@ -105,7 +105,7 @@ def make_sai_datasets(env_name):
 
     env = gymnasium.make(env_name, keyframe="init_frame")
 
-    with np.load(f'{dir_name}/dataset/{env_name}/train/FrankaGolfCourseEnv-v0_train.npz', allow_pickle=True) as data:
+    with np.load(f'{dir_name}/dataset/{env_name}/filtered_data_20250603_193255.npz', allow_pickle=True) as data:
         train_data = {key: data[key] for key in data}
 
     # with np.load(f'{dir_name}/dataset/{env_name}/val/{env_name}_val.npz', allow_pickle=True) as data:
@@ -119,9 +119,9 @@ def make_sai_datasets(env_name):
     # val_data["actions"] = scaler.transform(val_data["actions"])
     # train_data["actions"] = 2.*(train_data["actions"] - np.min(train_data["actions"]))/np.ptp(train_data["actions"])-1
     # val_data["actions"] = 2.*(val_data["actions"] - np.min(val_data["actions"]))/np.ptp(val_data["actions"])-1
-    # train_data["actions"][:,:-1] = train_data["actions"][:,:-1] * 100
+    train_data["actions"][:,:-1] = train_data["actions"][:,:-1] * 100
     # val_data["actions"][:,:-1] = val_data["actions"][:,:-1] * 100
-
+    print(train_data["terminals"])
     train_dataset = Dataset.create(**train_data)
     # val_dataset = Dataset.create(**val_data)
 
