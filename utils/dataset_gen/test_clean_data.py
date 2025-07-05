@@ -8,71 +8,37 @@ import sai_mujoco
 import json
 def main(args):
     dir_name = os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
-    data_path = f'{dir_name}/dataset/FrankaGolfCourseEnv-v0/train/FrankaGolfCourseEnv-v0_train_augmented.npz'
+    data_path = f'{dir_name}/dataset/FrankaGolfCourseEnv-v0/train/FrankaGolfCourseEnv-v0_train_augmented_new.npz'
     ep = np.load(data_path, allow_pickle=True)
-    env = gym.make("FrankaGolfCourseEnv-v0", keyframe="init_frame", render_mode="human")
+    ep = {key: ep[key] for key in ep}
+    env = gym.make("FrankaGolfCourseEnv-v0", keyframe="random", render_mode="human")
     def deterministic_int_generator(seed, low, high, count=1):
         rng = random.Random(seed)  # Create a local Random instance
         return [rng.randint(low, high) for _ in range(count)]
 
-    # mocap = env.unwrapped.robot_model.target_mocap_id
-    all_observations = []
-    all_actions = []
-    # all_next_observations = []
-    # all_rewards = []
-    all_dones = []
-    # j = [25, 58, 81,  94, 158]
-    # selected_obs = {str(idx): ep["observations"][idx].tolist() for idx in j}
-    # json_path = os.path.join(dir_name, "selected_observations.json")
-    # with open(json_path, 'w') as f:
-    #     json.dump(selected_obs, f, indent=4)
-    # print(ep["terminals"][:348])
-    observation, info = env.reset(seed=42)
-    numbers = deterministic_int_generator(seed=888, low=0, high=60000000, count=5)
+    seeds = [5358323, 28985083, 39189165, 29870374, 33325492, 25901236, 42270151, 25147293, 36334396, 28071442, 11538989, 47238118, 26383337, 59830579, 47981580, 25321605, 50589307, 42846884, 29011687, 18349814, 25256078, 36226747, 720534, 57825893, 38948598, 35500908, 42794164, 55428395, 24976170, 26673084, 16215911, 58235089, 21037645, 17657773, 15186251, 7472467, 40834818, 58502803, 20402671, 59007249, 19133894, 43259753, 53147608, 11068875, 52072653, 54662012, 47128098, 30768360, 15850428, 13389257, 40735564, 15347279, 46641981, 2800839, 50739821, 37435473, 14022423, 34746020, 32552496, 911277, 5184642, 49321153, 29919613, 55581979, 29309528, 21681783, 34508067, 49953776, 21132635, 18312787, 18695666, 49271997, 53429113, 49783488, 34563046, 10096147, 43669297, 55680577, 2509837, 14841971, 23854463, 26446839, 25810818, 33173524, 14106895, 14658861, 35645491, 53941424, 53041183, 20550682, 49625511, 18851595, 8547780, 4198080, 22538847, 7440840, 52103364, 51654887, 35992289, 51756317]
     j = 0
-    print(len(ep["actions"]))
+    observation, info = env.reset(seed = seeds[j])
+    print(ep["goal_idxs"])
+    numbers = deterministic_int_generator(seed=888, low=0, high=60000000, count=5)
+    print(ep["actions"].shape[0])
+
     # for i in range(len(ep["actions"][:348])):
     #     print(f'{i} : {ep["actions"][i]}')
-    print(ep["terminals"][187])
-    for i in range(353):
+    for i in range(ep["actions"].shape[0]):
         action = np.array(ep["actions"][i])
 
         action[-1] *= 255
-        # print("Current : ", observation)
-        # print("Obs : ", ep["observations"][i])
-        # # input()
-        # all_observations.append(observation)
-        # all_actions.append(ep["actions"][i])
-        if i in [7, 16, 27, 36, 42, 56, 188, 198, 206, 221, len(ep['observations'])-1]:
-            input()
-        # if i in [198, 206, 221, 227, 231, 264]:
-        #     print(env.unwrapped.robot_model.data.mocap_pos[mocap])
+
+        if i in list(ep["goal_idxs"]):
+            print(i)
         observation, reward, terminated, truncated, info = env.step(action)
         done = terminated
-        # all_next_observations.append(next_observation)
-        # all_rewards.append(reward)
-        all_dones.append(done)
 
-        if terminated or truncated:
+        if ep["terminals"][i]:
             print(j)
-            j =0
-            observation, info = env.reset(seed=42)
-        j += 1
-    print(all_dones)
-    # observation, info = env.reset()
-    print(True in all_dones)
-    env.close()
-    # print(all_observations)
-    # output_path = f'{dir_name}/dataset/FrankaGolfCourseEnv-v0/train/FrankaGolfCourseEnv-v0_train_augmented.npz'
-    # np.savez_compressed(
-    #     output_path,
-    #     observations=np.array(all_observations, dtype=np.float32),
-    #     actions=np.array(all_actions, dtype=np.float32),
-    #     # next_observations=np.array(all_next_observations, dtype=np.float32),
-    #     # rewards=np.array(all_rewards, dtype=np.float32),
-    #     terminals=np.array(all_dones, dtype=bool),
-    # )
-    # print(f"Saved augmented dataset to {output_path}")
+            j  += 1
+            observation, info = env.reset(seed = seeds[j])
     
 if __name__ == "__main__":
 
