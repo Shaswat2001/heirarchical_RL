@@ -105,7 +105,7 @@ def make_sai_datasets(env_name):
 
     env = gymnasium.make(env_name, keyframe="init_frame")
 
-    with np.load(f'{dir_name}/dataset/{env_name}/filtered_data_20250604_140137.npz', allow_pickle=True) as data:
+    with np.load(f'{dir_name}/dataset/{env_name}/train/FrankaGolfCourseEnv-v0_train_augmented.npz', allow_pickle=True) as data:
         train_data = {key: data[key] for key in data}
 
     # with np.load(f'{dir_name}/dataset/{env_name}/val/{env_name}_val.npz', allow_pickle=True) as data:
@@ -119,12 +119,24 @@ def make_sai_datasets(env_name):
     # val_data["actions"] = scaler.transform(val_data["actions"])
     # train_data["actions"] = 2.*(train_data["actions"] - np.min(train_data["actions"]))/np.ptp(train_data["actions"])-1
     # val_data["actions"] = 2.*(val_data["actions"] - np.min(val_data["actions"]))/np.ptp(val_data["actions"])-1
-    train_data["actions"][:,:-1] = train_data["actions"][:,:-1] * 100
-    train_data["observations"] = train_data["observations"][:348,:]
-    train_data["actions"] = train_data["actions"][:348,:]
-    train_data["terminals"] = train_data["terminals"][:348]
+    # train_data["actions"][:,:-1] = train_data["actions"][:,:-1] * 100
+    train_data["observations"] = train_data["observations"][:188,:]
+    train_data["actions"] = train_data["actions"][:188,:]
+    train_data["terminals"] = train_data["terminals"][:188]
+
+    from sklearn.preprocessing import MinMaxScaler
+    import pickle
+
+    scaler = MinMaxScaler(feature_range=(-1,1))
+    train_data["actions"] = scaler.fit_transform(train_data["actions"])
+    # print(train_data["actions"].shape)
+    # print(train_data['actions'])
+    with open('standard_scaler.pkl', 'wb') as f:
+        pickle.dump(scaler, f)
     # val_data["actions"][:,:-1] = val_data["actions"][:,:-1] * 100
-    print(train_data["terminals"])
+    # for i in range(len(train_data["actions"])):
+    
+    #     print(f'{i} : {train_data["actions"][i]}')
     train_dataset = Dataset.create(**train_data)
     # val_dataset = Dataset.create(**val_data)
 

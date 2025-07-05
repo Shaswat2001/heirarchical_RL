@@ -13,11 +13,11 @@ from utils.flax_utils import ModuleDict, TrainState, nonpytree_field
 GCBC_CONFIG_DICT = {
     "agent_name": 'gcbc',  # Agent name.
     "lr": 3e-5,  # Learning rate.
-    "batch_size": 1024,  # Batch size.
+    "batch_size": 64,  # Batch size.
     "actor_hidden_dims": (512, 512),  # Actor network hidden dimensions.
     "discount": 0.99,  # Discount factor (unused by default; can be used for geometric goal sampling in GCDataset).
     "clip_threshold": 100.0,
-    "const_std": True,  # Whether to use constant standard deviation for the actor.
+    "const_std": False,  # Whether to use constant standard deviation for the actor.
     "discrete": False,  # Whether the action space is discrete.
     # Dataset hyperparameters.
     "dataset_class": 'GCDataset',  # Dataset class name.
@@ -30,7 +30,7 @@ GCBC_CONFIG_DICT = {
     "actor_p_randomgoal": 0.0,  # Probability of using a random state as the actor goal.
     "actor_geom_sample": False,  # Whether to use geometric sampling for future actor goals.
     "gc_negative": True,  # Unused (defined for compatibility with GCDataset).
-    "bc_method": "mse"
+    "bc_method": "prob"
 }
 
 class GCBCAgent(flax.struct.PyTreeNode):
@@ -38,7 +38,7 @@ class GCBCAgent(flax.struct.PyTreeNode):
     rng: Any
     network: Any
     config: Any = nonpytree_field()
-    weights: Sequence[int] = (1000, 1000, 1000, 1000, 1000, 1000, 1)
+    weights: Sequence[int] = (1, 1, 1, 1, 1, 1, 0.1)
 
     @jax.jit
     def actor_loss(self, batch, grad_params, rng=None):
@@ -66,8 +66,15 @@ class GCBCAgent(flax.struct.PyTreeNode):
     def actor_mse_loss(self, batch, grad_params, rng=None):
 
         actions = self.network.select('actor')(batch['observations'], batch['actor_goals'], params=grad_params)
-
-        actor_loss = optax.huber_loss(actions, batch['actions']) * self.weights
+        actions = actions * self.weights
+        true_actions = batch["actions"] * self.weights
+        # val = jnp.sqrt((actions - batch['actions'])**2) * self.weights
+        # t = (actions - batch['actions'])**2
+        # jax.debug.print("Actor: {}", actions)
+        actor_loss = optax.l2_loss(actions, true_actions)
+        # actor_loss = jnp.sqrt((actions - batch['actions'])**2) * self.weights
+        # jax.debug.print("Actor loss: {}", actor_loss)
+        # jax.debug.print("Actor loss: {}", actor_loss.mean().shape)
         actor_loss = actor_loss.mean() 
         # actor_loss = optax.huber_loss(actions, batch['actions']).mean()
 
@@ -112,7 +119,7 @@ class GCBCAgent(flax.struct.PyTreeNode):
             actions = self.network.select('actor')(observation, goal)
         else:
             dist = self.network.select('actor')(observation, goal, temperature=temperature)
-            actions = dist.sample(seed= seed)
+            actions = dist.mode()
             actions = jnp.clip(actions, -1.0, 1.0)
 
         return actions
