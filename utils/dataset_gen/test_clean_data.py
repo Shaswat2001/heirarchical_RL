@@ -8,7 +8,7 @@ import sai_mujoco
 import json
 def main(args):
     dir_name = os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
-    data_path = '/Users/shaswatgarg/Documents/Job/ArenaX/Development/heirarchical_RL/dataset/FrankaGolfCourseEnv-v0/train/FrankaIkGolfCourseEnv-v0_train_augmented.npz'
+    data_path = f'{dir_name}/dataset/FrankaGolfCourseEnv-v0/train/FrankaGolfCourseEnv-v0_train_augmented.npz'
     ep = np.load(data_path, allow_pickle=True)
     env = gym.make("FrankaGolfCourseEnv-v0", keyframe="init_frame", render_mode="human")
     def deterministic_int_generator(seed, low, high, count=1):
@@ -33,15 +33,18 @@ def main(args):
     print(len(ep["actions"]))
     # for i in range(len(ep["actions"][:348])):
     #     print(f'{i} : {ep["actions"][i]}')
-    for i in range(348):
+    print(ep["terminals"][187])
+    for i in range(353):
         action = np.array(ep["actions"][i])
 
         action[-1] *= 255
-        # print(observation)
-        # print(ep["observations"][i])
-        # input()
-        all_observations.append(observation)
-        all_actions.append(ep["actions"][i])
+        # print("Current : ", observation)
+        # print("Obs : ", ep["observations"][i])
+        # # input()
+        # all_observations.append(observation)
+        # all_actions.append(ep["actions"][i])
+        if i in [7, 16, 27, 36, 42, 56, 188, 198, 206, 221, len(ep['observations'])-1]:
+            input()
         # if i in [198, 206, 221, 227, 231, 264]:
         #     print(env.unwrapped.robot_model.data.mocap_pos[mocap])
         observation, reward, terminated, truncated, info = env.step(action)
@@ -55,19 +58,20 @@ def main(args):
             j =0
             observation, info = env.reset(seed=42)
         j += 1
+    print(all_dones)
     # observation, info = env.reset()
     print(True in all_dones)
     env.close()
     # print(all_observations)
-    output_path = f'{dir_name}/dataset/FrankaGolfCourseEnv-v0/train/FrankaGolfCourseEnv-v0_train_augmented.npz'
-    np.savez_compressed(
-        output_path,
-        observations=np.array(all_observations, dtype=np.float32),
-        actions=np.array(all_actions, dtype=np.float32),
-        # next_observations=np.array(all_next_observations, dtype=np.float32),
-        # rewards=np.array(all_rewards, dtype=np.float32),
-        dones=np.array(all_dones, dtype=bool),
-    )
+    # output_path = f'{dir_name}/dataset/FrankaGolfCourseEnv-v0/train/FrankaGolfCourseEnv-v0_train_augmented.npz'
+    # np.savez_compressed(
+    #     output_path,
+    #     observations=np.array(all_observations, dtype=np.float32),
+    #     actions=np.array(all_actions, dtype=np.float32),
+    #     # next_observations=np.array(all_next_observations, dtype=np.float32),
+    #     # rewards=np.array(all_rewards, dtype=np.float32),
+    #     terminals=np.array(all_dones, dtype=bool),
+    # )
     # print(f"Saved augmented dataset to {output_path}")
     
 if __name__ == "__main__":

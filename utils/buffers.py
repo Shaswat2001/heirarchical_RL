@@ -64,7 +64,7 @@ class GCDataset:
 
         (self.where_terminate, ) = np.nonzero(self.dataset["terminals"] > 0)
 
-        self.boundaries = np.array([8, 16, 27, 36, 42, 56, 188, 198, 206, 221, len(self.dataset['observations'])])
+        self.boundaries = np.array([7, 16, 27, 36, 42, 56, 187])#188, 198, 206, 221, len(self.dataset['observations'])-1])
 
         assert self.where_terminate[-1] == self.size - 1
 
@@ -112,7 +112,7 @@ class GCDataset:
         # Random goals.
         random_goal_idxs = self.dataset.get_random_idxs(batch_size)
         cap_idxs = self.boundaries[np.searchsorted(self.boundaries, idxs)]
-        # print("cap: ", cap_idxs)
+        # print("cap: ", idxs)
 
         # Goals from the same trajectory (excluding the current state, unless it is the final state).
         final_state_idxs = self.where_terminate[np.searchsorted(self.where_terminate, idxs)]
@@ -140,7 +140,7 @@ class GCDataset:
             # Goals at the current state.
             goal_idxs = np.where(np.random.rand(batch_size) < p_curgoal, idxs, goal_idxs)
         
-        goal_idxs = np.minimum(goal_idxs, cap_idxs)
+        goal_idxs = cap_idxs
         # print("idxs: ", idxs)
         # print("goal idxs: ", goal_idxs)
         return goal_idxs

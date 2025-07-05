@@ -29,11 +29,11 @@ def sanitize_metrics(metrics):
 
 def main(args):
 
-    # exp_name = get_exp_name(args.env_name, args.agents)
-    # setup_wandb(project='hrl-arenaX', group=args.run_group, name=exp_name)
+    exp_name = get_exp_name(args.env_name, args.agents)
+    setup_wandb(project='hrl-arenaX', group=args.run_group, name=exp_name)
 
-    # args.save_dir = os.path.join(args.save_dir, wandb.run.project, args.run_group, exp_name)
-    # os.makedirs(args.save_dir, exist_ok=True)
+    args.save_dir = os.path.join(args.save_dir, wandb.run.project, args.run_group, exp_name)
+    os.makedirs(args.save_dir, exist_ok=True)
 
     if args.env_module == "ogbench":
         env, train_dataset, val_dataset = make_env_and_datasets(args.env_name)
@@ -60,6 +60,7 @@ def main(args):
 
     first_time = time.time()
     last_time = time.time()
+    actor_loss = 1000
     for i in tqdm.tqdm(range(1, args.offline_steps + 1), smoothing=0.1, dynamic_ncols=True):
         # Update agent.
         batch = train_dataset.sample(agent_config['batch_size'])
@@ -76,6 +77,10 @@ def main(args):
             train_metrics['time/total_time'] = time.time() - first_time
             last_time = time.time()
             # print(train_metrics)
+            train_metrics = sanitize_metrics(train_metrics)
+            if train_metrics["training/actor/actor_loss"] < actor_loss:
+                actor_loss = train_metrics["training/actor/actor_loss"]
+                save_agent(agent, args.save_dir, 0)
             wandb.log(sanitize_metrics(train_metrics), step=i)
 
         # # Evaluate agent.
@@ -151,11 +156,11 @@ if __name__ == "__main__":
 
     parser.add_argument('--run_group', type=str, default='Debug', help='Run group.')
     parser.add_argument('--seed', type=int, default=0, help='Random seed.')
-    parser.add_argument('--agents', type=str, default="bc", help='Agent to load.')
+    parser.add_argument('--agents', type=str, default="gcbc", help='Agent to load.')
 
     # Environment
     parser.add_argument('--env_module', type=str, default='sai', help='Environment (dataset) name.')
-    parser.add_argument('--env_name', type=str, default='FrankaIkGolfCourseEnv-v0', help='Environment (dataset) name.')
+    parser.add_argument('--env_name', type=str, default='FrankaGolfCourseEnv-v0', help='Environment (dataset) name.')
     parser.add_argument('--dataset_dir', type=str, default="~/.ogbench/data", help='Dataset directory.')
     parser.add_argument('--dataset_replace_interval', type=int, default=1000, help='Dataset replace interval.')
     parser.add_argument('--num_datasets', type=int, default=None, help='Number of datasets to use.')
