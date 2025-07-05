@@ -4,14 +4,14 @@ import argparse
 import numpy as np
 
 import copy
-from agents import agents
 import gymnasium as gym
 import sai_mujoco
 
 def main(args):
 
-    input_dir = "/home/ubuntu/uploads/heirarchical_RL/dataset/FrankaIkGolfCourseEnv-v0/train/"  # <-- change this
+    input_dir = "/Users/shaswatgarg/Documents/Job/ArenaX/Development/heirarchical_RL/dataset/FrankaIkGolfCourseEnv-v0/"  # <-- change this
     env = gym.make(args.env_name, keyframe="init_frame")
+    print(env.unwrapped.robot_model.model.actuator_ctrlrange)
     # List all .npz files in the folder
     npz_files = [f for f in os.listdir(input_dir) if f.endswith(".npz")]
     print(npz_files)
@@ -41,11 +41,11 @@ def main(args):
         # print(joint_dataset["actions"])
         joint_dataset["actions"] = np.array(joint_dataset["actions"],dtype=np.float32)
         # print(joint_dataset["actions"].shape)
-        a = 2.*(joint_dataset["actions"] - np.min(joint_dataset["actions"]))/np.ptp(joint_dataset["actions"])-1
-        print(a)
-        # print(joint_dataset["actions"])
-        print(np.max(a))
-        print(np.min(a))
+        # a = 2.*(joint_dataset["actions"] - np.min(joint_dataset["actions"]))/np.ptp(joint_dataset["actions"])-1
+        # print(a)
+        # # print(joint_dataset["actions"])
+        # print(np.max(a))
+        # print(np.min(a))
         # print(joint_dataset["terminals"].shape)
         # print(joint_dataset["observations"].shape)
         output_path = os.path.join(input_dir, f"{filename}_joint.npz")
