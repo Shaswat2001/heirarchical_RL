@@ -40,13 +40,13 @@ def main(args):
     agent = restore_agent(agent, args.restore_path, args.restore_epoch)
     agent = supply_rng(agent.get_actions, rng=jax.random.PRNGKey(np.random.randint(0, 2**32)))
     env = gym.make(args.env_name, keyframe="init_frame",render_mode="human")
-    observation, info = env.reset(seed=42)
+    observation, info = env.reset(seed=25147293)
     rwd = []
-    with np.load(f'/home/ubuntu/uploads/heirarchical_RL/dataset/FrankaGolfCourseEnv-v0/train/FrankaGolfCourseEnv-v0_train_augmented.npz', allow_pickle=True) as data:
+    with np.load(f'/home/ubuntu/uploads/heirarchical_RL/dataset/FrankaGolfCourseEnv-v0/train/FrankaGolfCourseEnv-v0_train_augmented_new.npz', allow_pickle=True) as data:
         train_data = {key: data[key] for key in data}
 
     j = [0, 7, 16, 27, 36, 42, 56, 187]
-    threshold = [0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1]
+    threshold = [0.23, 0.1, 0.45, 0.1, 0.1, 0.1, 0.1, 0.1]
     # threshold = [4, 6, 6, 6, 6, 6, 6]
     i = 0
     k =0
@@ -58,6 +58,7 @@ def main(args):
     while True:
         # input = np.hstack([observation, train_data["observations"][i+1]]).reshape(1,-1)
         action = agent(observation=observation, goal=train_data["observations"][j[i]], temperature=0.0)
+        # action = agent(observation=observation, temperature=0.0)
         # action = model(input)
         action = np.array(action)
         dist = np.linalg.norm(observation - train_data["observations"][j[i]])
@@ -99,7 +100,7 @@ def main(args):
 
         if terminated or truncated:
             i = 0
-            observation, info = env.reset()
+            observation, info = env.reset(seed = 25147293)
     env.close()
     
 if __name__ == "__main__":
@@ -115,7 +116,7 @@ if __name__ == "__main__":
     parser.add_argument('--env_name', type=str, default='FrankaGolfCourseEnv-v0', help='Environment (dataset) name.')
 
     # Save / restore
-    parser.add_argument('--restore_path', type=str, default='exp/hrl-arenaX/Debug/FrankaGolfCourseEnv_20250705-233305_gcbc', help='Save directory.')
+    parser.add_argument('--restore_path', type=str, default='exp/hrl-arenaX/Debug/FrankaGolfCourseEnv_20250706-150553_gcbc', help='Save directory.')
     parser.add_argument('--restore_epoch', type=int, default=0, help='Epoch checkpoint.')
 
     args = parser.parse_args()

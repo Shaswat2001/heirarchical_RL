@@ -12,7 +12,7 @@ from utils.flax_utils import ModuleDict, TrainState, nonpytree_field
 
 HIQL_CONFIG_DICT = {
     "agent_name": 'hiql',  # Agent name.
-    "lr": 1e-4,  # Learning rate.
+    "lr": 3e-5,  # Learning rate.
     "batch_size": 1024,  # Batch size.
     "actor_hidden_dims": (256, 256),  # Actor network hidden dimensions.
     "value_hidden_dims": (256, 256),  # Value network hidden dimensions.
@@ -139,6 +139,7 @@ class HIQLAgent(flax.struct.PyTreeNode):
             info[f'low_actor/{k}'] = v
 
         loss = low_actor_loss + value_loss + high_actor_loss
+        info["total_loss"] = loss
         return loss, info
     
     def update_target_network(self, network, function_name):

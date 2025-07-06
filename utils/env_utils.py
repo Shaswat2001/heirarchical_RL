@@ -130,6 +130,8 @@ def make_sai_datasets(env_name):
     # print(train_data['actions'])
     with open('standard_scaler.pkl', 'wb') as f:
         pickle.dump(scaler, f)
+    
+    print(train_data["actions"].shape)
     # val_data["actions"][:,:-1] = val_data["actions"][:,:-1] * 100
     # for i in range(len(train_data["actions"])):
     

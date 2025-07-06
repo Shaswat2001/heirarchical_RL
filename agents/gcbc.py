@@ -12,9 +12,9 @@ from utils.flax_utils import ModuleDict, TrainState, nonpytree_field
 
 GCBC_CONFIG_DICT = {
     "agent_name": 'gcbc',  # Agent name.
-    "lr": 3e-5,  # Learning rate.
-    "batch_size": 64,  # Batch size.
-    "actor_hidden_dims": (512, 512),  # Actor network hidden dimensions.
+    "lr": 3e-4,  # Learning rate.
+    "batch_size": 1024,  # Batch size.
+    "actor_hidden_dims": (512, 512, 512),  # Actor network hidden dimensions.
     "discount": 0.99,  # Discount factor (unused by default; can be used for geometric goal sampling in GCDataset).
     "clip_threshold": 100.0,
     "const_std": False,  # Whether to use constant standard deviation for the actor.
@@ -119,7 +119,7 @@ class GCBCAgent(flax.struct.PyTreeNode):
             actions = self.network.select('actor')(observation, goal)
         else:
             dist = self.network.select('actor')(observation, goal, temperature=temperature)
-            actions = dist.mode()
+            actions = dist.sample(seed=seed)
             actions = jnp.clip(actions, -1.0, 1.0)
 
         return actions
