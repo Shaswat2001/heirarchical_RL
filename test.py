@@ -45,8 +45,8 @@ def main(args):
     with np.load(f'/home/ubuntu/uploads/heirarchical_RL/dataset/FrankaGolfCourseEnv-v0/train/FrankaGolfCourseEnv-v0_train_augmented.npz', allow_pickle=True) as data:
         train_data = {key: data[key] for key in data}
 
-    j = [7, 16, 27, 36, 42, 56, 187]
-    threshold = [0.1, 0.25, 0.45, 0.37, 0.1, 0.1, 0.1]
+    j = [0, 7, 16, 27, 36, 42, 56, 187]
+    threshold = [0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1]
     # threshold = [4, 6, 6, 6, 6, 6, 6]
     i = 0
     k =0
@@ -115,7 +115,7 @@ if __name__ == "__main__":
     parser.add_argument('--env_name', type=str, default='FrankaGolfCourseEnv-v0', help='Environment (dataset) name.')
 
     # Save / restore
-    parser.add_argument('--restore_path', type=str, default='exp/hrl-arenaX/Debug/FrankaGolfCourseEnv_20250705-173614_gcbc', help='Save directory.')
+    parser.add_argument('--restore_path', type=str, default='exp/hrl-arenaX/Debug/FrankaGolfCourseEnv_20250705-233305_gcbc', help='Save directory.')
     parser.add_argument('--restore_epoch', type=int, default=0, help='Epoch checkpoint.')
 
     args = parser.parse_args()
