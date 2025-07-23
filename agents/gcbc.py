@@ -43,7 +43,10 @@ class GCBCAgent(flax.struct.PyTreeNode):
     @jax.jit
     def actor_loss(self, batch, grad_params, rng=None):
 
-        dist = self.network.select('actor')(batch['observations'], batch['actor_goals'], params=grad_params)
+        observations = batch['observations']
+        observations += 0.01*jax.random.uniform(rng, shape=observations.shape,minval=-1,maxval=1)
+
+        dist = self.network.select('actor')(observations, batch['actor_goals'], params=grad_params)
         log_prob = dist.log_prob(batch['actions'])
 
         actor_loss = -log_prob.mean()

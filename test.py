@@ -40,13 +40,13 @@ def main(args):
     agent = restore_agent(agent, args.restore_path, args.restore_epoch)
     agent = supply_rng(agent.get_actions, rng=jax.random.PRNGKey(np.random.randint(0, 2**32)))
     env = gym.make(args.env_name, keyframe="init_frame",render_mode="human")
-    observation, info = env.reset(seed=25147293)
+    observation, info = env.reset()
     rwd = []
     with np.load(f'/home/ubuntu/uploads/heirarchical_RL/dataset/FrankaGolfCourseEnv-v0/train/FrankaGolfCourseEnv-v0_train_augmented_new.npz', allow_pickle=True) as data:
         train_data = {key: data[key] for key in data}
 
     j = [0, 7, 16, 27, 36, 42, 56, 187]
-    threshold = [0.23, 0.1, 0.45, 0.1, 0.1, 0.1, 0.1, 0.1]
+    threshold = [0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1]
     # threshold = [4, 6, 6, 6, 6, 6, 6]
     i = 0
     k =0
@@ -56,6 +56,7 @@ def main(args):
     with open('standard_scaler.pkl', 'rb') as f:
         loaded_scaler = pickle.load(f)
     while True:
+
         # input = np.hstack([observation, train_data["observations"][i+1]]).reshape(1,-1)
         action = agent(observation=observation, goal=train_data["observations"][j[i]], temperature=0.0)
         # action = agent(observation=observation, temperature=0.0)
@@ -67,8 +68,23 @@ def main(args):
         action[-1] *= 255
         print(i)
         print(dist)
+        print(observation[:7])
+        print(action)
         # input()
         k += 1
+        # print(np.linalg.norm(observation[:7] - train_data["observations"][k][:7]))
+
+        # if k > 40:
+        #     print("IN")
+        #     print(i)
+        #     direction = train_data["observations"][j[i]][:7] - observation[:7]
+        #     unit_dir = direction / np.linalg.norm(direction)
+        #     action[:7] += unit_dir * 0.045
+
+        #     for _ in range(20):
+        #         observation, reward, terminated, truncated, info = env.step(action)
+        #     k = 0
+
         # action = np.clip(action, -1, 1)
         # action[:-1] = action[:-1]*0.01
 
@@ -88,19 +104,22 @@ def main(args):
 
         # action[-1] *= 255
 
-        observation, reward, terminated, truncated, info = env.step(action)
+        for m in range(5):
+            observation, reward, terminated, truncated, info = env.step(action)
+        # print(observation)
         rwd.append(reward)
         env.render()
 
         if dist < threshold[i]:
             i += 1
+            # k = 0
             i = min(i, len(threshold)-1)
         # if i < 80:
         #     i += 1
 
         if terminated or truncated:
             i = 0
-            observation, info = env.reset(seed = 25147293)
+            observation, info = env.reset()
     env.close()
     
 if __name__ == "__main__":
@@ -116,7 +135,7 @@ if __name__ == "__main__":
     parser.add_argument('--env_name', type=str, default='FrankaGolfCourseEnv-v0', help='Environment (dataset) name.')
 
     # Save / restore
-    parser.add_argument('--restore_path', type=str, default='exp/hrl-arenaX/Debug/FrankaGolfCourseEnv_20250706-150553_gcbc', help='Save directory.')
+    parser.add_argument('--restore_path', type=str, default='exp/hrl-arenaX/Debug/FrankaGolfCourseEnv_20250710-001554_gcbc', help='Save directory.')
     parser.add_argument('--restore_epoch', type=int, default=0, help='Epoch checkpoint.')
 
     args = parser.parse_args()
