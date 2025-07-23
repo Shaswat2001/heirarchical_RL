@@ -6,7 +6,7 @@ import jax.numpy as jnp
 
 import copy
 from utils.networks import GCActor, GCDetActor
-from typing import Any, Sequence
+from typing import Any
 from utils.flax_utils import ModuleDict, TrainState, nonpytree_field
 
 GCBC_CONFIG_DICT = {

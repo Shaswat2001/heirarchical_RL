@@ -5,7 +5,6 @@ import optax
 import jax.numpy as jnp
 
 import copy
-import functools
 from utils.networks import GCActor, GCValue
 from typing import Any
 from utils.flax_utils import ModuleDict, TrainState, nonpytree_field

@@ -8,7 +8,6 @@ import numpy as np
 import jax.numpy as jnp
 
 import copy
-import functools
 from utils.networks import GCTanhGaussianActor, GCValue, GCLaplaceActor
 from typing import Any
 from utils.flax_utils import ModuleDict, TrainState, nonpytree_field
