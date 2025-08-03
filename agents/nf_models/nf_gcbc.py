@@ -81,10 +81,10 @@ class NFGCBCAgent(flax.struct.PyTreeNode):
         return self.replace(network=new_network, rng=new_rng), info
 
     @partial(jax.jit, static_argnames=['num_eval_episodes'])
-    def get_actions(self, observation, goal, num_eval_episodes, seed= None):
+    def get_actions(self, observation, goal, num_eval_episodes=None, seed= None):
 
-        prior_sample = self.prior.sample(sample_shape=(num_eval_episodes,), seed=seed)
-        obs_goal = jnp.concatenate([observation, goal], axis=-1).astype(jnp.float32)
+        prior_sample = self.prior.sample(sample_shape=(1,), seed=seed)
+        obs_goal = jnp.concatenate([observation, goal], axis=-1).astype(jnp.float32).reshape(1,-1)
         encode_obs_goal = self.network.select("encoder")(obs_goal)
         action, _ = self.network.select("actor")(prior_sample, encode_obs_goal, reverse=True)
 

@@ -43,7 +43,7 @@ class CouplingLayer(nn.Module):
 
     def reverse(self, z, y):
         
-        z1, z2 = jnp.array_split(z, 2)
+        z1, z2 = jnp.hsplit(z, 2)
         s = self.s(jnp.concatenate([z1, y], axis=-1))
         t = self.t(jnp.concatenate([z1, y], axis=-1))
 
