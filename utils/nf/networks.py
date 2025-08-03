@@ -30,7 +30,7 @@ class CouplingLayer(nn.Module):
     
     def forward(self, x, y):
         
-        x1, x2 = jnp.array_split(x, 2)
+        x1, x2 = jnp.hsplit(x, 2)
         s = self.s(jnp.concatenate([x1, y], axis=-1))
         t = self.t(jnp.concatenate([x1, y], axis=-1))
 

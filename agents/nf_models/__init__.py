@@ -1,1 +1,1 @@
-from nf_gcbc import NFGCBCAgent, NFGCBC_CONFIG_DICT
+from .nf_gcbc import NFGCBCAgent, NFGCBC_CONFIG_DICT

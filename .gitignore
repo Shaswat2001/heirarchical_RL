@@ -1,6 +1,8 @@
 /runs/
 /networks/torch/__pycache__
 /agents/__pycache__
+/agents/nf_models/__pycache__
+/utils/nf/__pycache__
 /utils/__pycache__
 /trainers/__pycache__
 /exp/

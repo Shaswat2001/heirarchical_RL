@@ -43,14 +43,13 @@ class NFGCBCAgent(flax.struct.PyTreeNode):
     def actor_loss(self, batch, grad_params, rng):
 
         obs_goal = jnp.concatenate([batch["observations"], batch["actor_goals"]], axis=-1).astype(jnp.float32)
-        encod = self.network.apply("encoder")(obs_goal)
-        z, logdets = self.network.apply("actor")(batch["actions"], encod, params=grad_params)
+        encod = self.network.select("encoder")(obs_goal)
+        z, logdets = self.network.select("actor")(batch["actions"], encod, params=grad_params)
         loss = - (self.prior.log_prob(z) + logdets).mean()
-
         info = {
-                    'actor/loss' : loss.item(),
-                    'actor/logdets' : logdets.mean().item(),
-                    'actor/norms/layer__0' : jnp.square(z).mean().item()
+                    'actor/loss' : loss,
+                    'actor/logdets' : logdets.mean(),
+                    'actor/norms/layer__0' : jnp.square(z).mean()
                 }
         
         return loss, info
@@ -87,7 +86,7 @@ class NFGCBCAgent(flax.struct.PyTreeNode):
         prior_sample = self.prior.sample(sample_shape=(num_eval_episodes,), seed=seed)
         obs_goal = jnp.concatenate([observation, goal], axis=-1).astype(jnp.float32)
         encode_obs_goal = self.network.select("encoder")(obs_goal)
-        action, _ = self.network.apply("actor")(prior_sample, encode_obs_goal, reverse=True)
+        action, _ = self.network.select("actor")(prior_sample, encode_obs_goal, reverse=True)
 
         return action
 
@@ -104,9 +103,10 @@ class NFGCBCAgent(flax.struct.PyTreeNode):
         observation_dim = ex_observations.shape[-1]
         encode_dim = _cfg["encode_dim"]
 
+        ex_encode = jnp.zeros((1, encode_dim))
         nvp_def = RealNVP(
             _cfg["num_blocks"],
-            _cfg["actor_hidden_dims"]
+            (*_cfg["actor_hidden_dims"], action_dim//2)
         )
 
         encode_def = RealNVPEncoder(
@@ -115,8 +115,8 @@ class NFGCBCAgent(flax.struct.PyTreeNode):
         )
 
         network_info = dict(
-            actor=(nvp_def, (action_dim, encode_dim)),
-            encoder=(encode_def,(ex_observations*2))
+            actor=(nvp_def, (ex_actions, ex_encode)),
+            encoder=(encode_def,(jnp.concatenate([ex_observations, ex_observations], axis=-1)))
         )
 
         prior = create_prior(action_dim)
