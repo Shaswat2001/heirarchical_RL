@@ -5,3 +5,4 @@
 /trainers/__pycache__
 /exp/
 .DS_Store
+*.TXT
