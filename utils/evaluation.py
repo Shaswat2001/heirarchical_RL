@@ -33,6 +33,64 @@ def add_to(dict_of_lists, single_dict):
     for k, v in single_dict.items():
         dict_of_lists[k].append(v)
 
+def evaluate_nf(
+        agent,
+        envs,
+        task_id=None,
+        config=None,
+        num_eval_episodes=50,
+    ):
+        
+        actor_fn = supply_rng(agent.get_actions, rng=jax.random.PRNGKey(np.random.randint(0, 2**32)))
+        trajs = []
+        stats = defaultdict(list)
+        
+        for task_id in trange(1, num_tasks + 1):
+            task_name = task_infos[task_id - 1]['task_name']
+
+            results = []
+            for idx, env in enumerate(envs.envs):
+                results.append( env.reset(seed=seed+idx, options=dict(task_id=task_id, render_goal=False)) )
+        
+            done = np.zeros((num_eval_episodes,), dtype=bool)
+            success = np.zeros((num_eval_episodes,))
+
+            obs_list, info_list = zip(*results)
+            goal_list = []
+            for info in info_list:
+                goal_list.append( info.get('goal') )
+            observation = np.stack(obs_list, axis=0)
+            goal = np.stack(goal_list, axis=0)
+
+            step = 0
+            while not np.all(done):
+                action_sample_key, eval_key = jax.random.split(eval_key)
+                if action_len_pred is not None:
+                    raise NotImplementedError
+                else:
+                    if denoise_action:
+                        action = get_denoised_action(actor_state, observation, goal, action_sample_key, num_eval_episodes)
+                    else:
+                        action = get_action(actor_state, observation, goal, action_sample_key, num_eval_episodes)
+
+                    action = action
+                    action = np.clip(jax.device_get(action), -1, 1)
+                
+                next_observation, reward, next_done, info = envs.step(action)
+                step += 1
+                step_success = []
+                for i in info:
+                    step_success.append( i.get('success') )
+                
+                success = (1-done) * np.array(step_success) + done * success
+
+                done = np.logical_or(next_done, done) 
+                observation = next_observation
+            
+            stats[f'evaluation/{task_name}_success'] = success
+            stats[f'evaluation/overall_success'] = np.append(stats[f'evaluation/overall_success'], success)
+        
+        return stats
 
 def evaluate(
     agent,
@@ -110,77 +168,6 @@ def evaluate(
             trajs.append(traj)
         else:
             renders.append(np.array(render))
-
-    for k, v in stats.items():
-        stats[k] = np.mean(v)
-
-    return stats, trajs, renders
-
-def evaluate_sai(
-    agent,
-    env,
-    config=None,
-    num_eval_episodes=50,
-    num_video_episodes=0,
-    video_frame_skip=3,
-    eval_temperature=0,
-    eval_gaussian=None,
-):
-    """Evaluate the agent in the environment.
-
-    Args:
-        agent: Agent.
-        env: Environment.
-        task_id: Task ID to be passed to the environment.
-        config: Configuration dictionary.
-        num_eval_episodes: Number of episodes to evaluate the agent.
-        num_video_episodes: Number of episodes to render. These episodes are not included in the statistics.
-        video_frame_skip: Number of frames to skip between renders.
-        eval_temperature: Action sampling temperature.
-        eval_gaussian: Standard deviation of the Gaussian noise to add to the actions.
-
-    Returns:
-        A tuple containing the statistics, trajectories, and rendered videos.
-    """
-    actor_fn = supply_rng(agent.get_actions, rng=jax.random.PRNGKey(np.random.randint(0, 2**32)))
-    trajs = []
-    stats = defaultdict(list)
-
-    renders = []
-    for i in trange(num_eval_episodes + num_video_episodes):
-        traj = defaultdict(list)
-        should_render = i >= num_eval_episodes
-
-        observation, info = env.reset()
-        goal = info.get('goal')
-        # goal_frame = info.get('goal_rendered')
-        done = False
-        step = 0
-        while not done:
-            action = actor_fn(observation=observation, goal=goal, temperature=eval_temperature)
-            action = np.array(action)
-            action[-1] *= 255
-            if not config.get('discrete'):
-                if eval_gaussian is not None:
-                    action = np.random.normal(action, eval_gaussian)
-                action = np.clip(action, -1.0, 1.0)
-            next_observation, reward, terminated, truncated, info = env.step(action)
-            done = terminated or truncated
-            step += 1
-
-            transition = dict(
-                observation=observation,
-                next_observation=next_observation,
-                action=action,
-                reward=reward,
-                done=done,
-                info=info,
-            )
-            add_to(traj, transition)
-            observation = next_observation
-        if i < num_eval_episodes:
-            add_to(stats, flatten(info))
-            trajs.append(traj)
 
     for k, v in stats.items():
         stats[k] = np.mean(v)
