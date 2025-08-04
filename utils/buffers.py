@@ -30,62 +30,6 @@ class Dataset(FrozenDict):
 
         return np.random.randint(self.size, size=batch_size)
     
-    def create_biased_data(self, goals):
-
-        goal_rows = [[7, 16, 27, 36, 42, 56, 187],[198, 206, 221, 352]]
-        goals = goals[11:]
-        goal_rows = [goals[i:i+8] for i in range(0, len(goals), 8)]
-        biased_ranges = []
-
-        for i, row in enumerate(goal_rows):
-            if len(row) < 8:
-                continue  # Skip incomplete row
-
-            # Add ranges between row[1] and row[7]
-            for j in range(0, 6):
-                biased_ranges.append((row[j], row[j+1]))
-
-            # # Add boundary to next row if exists
-            # if i + 1 < len(goal_rows):
-            #     next_row = goal_rows[i + 1]
-            #     if len(next_row) >= 1:
-            #         biased_ranges.append((row[7], next_row[0]))
-
-        # Flatten all allowed indices in biased regions
-        biased_idxs = []
-        for start, end in biased_ranges:
-            biased_idxs.extend(list(range(start, min(end, self.size))))  # Clip to dataset size
-
-        # Deduplicate and clip
-        self.biased_idxs = list(set([i for i in biased_idxs if i < self.size]))
-    
-    def get_biased_idxs(self, batch_size, proportion=1.0):
-        """
-        Samples batch with emphasis on intermediate regions between goals[1:7] in each row of 8,
-        and boundary between last of row N and first of row N+1.
-        
-        Args:
-            batch_size: Total number of samples.
-            goals: List of goal indices.
-            proportion: Fraction of samples to draw from the biased region.
-        """
-        # Group goals into rows of 8
-
-        # Sample from biased region
-        n_biased = int(batch_size * proportion)
-        n_random = batch_size - n_biased
-
-        biased_sample_idxs = np.random.choice(self.biased_idxs, size=n_biased, replace=len(self.biased_idxs) < n_biased)
-        random_sample_idxs = self.get_random_idxs(n_random)
-
-        all_idxs = np.concatenate([biased_sample_idxs, random_sample_idxs])
-        return all_idxs
-
-    
-    def biased_sample(self, idxs = None):
-
-        return self.get_subset(idxs)
-    
     def sample(self, batch_size, idxs = None):
 
         if idxs is None:
@@ -163,8 +107,7 @@ class GCDataset:
             # Geometric sampling.
             offsets = np.random.geometric(p=1 - self.config['discount'], size=batch_size)  # in [1, inf)
             traj_goal_idxs = np.minimum(idxs + offsets, final_state_idxs)
-            traj_goal_idxs = np.minimum(traj_goal_idxs, cap_idxs)
-        else:
+=        else:
             # Uniform sampling.
             distances = np.random.rand(batch_size)  # in [0, 1)
             traj_goal_idxs = np.round(

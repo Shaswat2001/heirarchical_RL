@@ -80,8 +80,7 @@ def evaluate_nf(
         done = np.logical_or(next_done, done) 
         observation = next_observation
     
-    stats[f'evaluation/{task_id}_success'] = success
-    stats[f'evaluation/overall_success'] = np.append(stats[f'evaluation/overall_success'], success)
+    stats[f'success'] = success.mean()
 
     return stats, None
     
