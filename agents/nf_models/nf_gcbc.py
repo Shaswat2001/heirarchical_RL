@@ -11,8 +11,8 @@ from utils.flax_utils import ModuleDict, TrainState, nonpytree_field
 NFGCBC_CONFIG_DICT = {
     "agent_name": 'nfgcbc',  # Agent name.
     "lr": 3e-4,  # Learning rate.
-    "batch_size": 1024,  # Batch size.
-    "actor_hidden_dims": (512, 512, 512),  # Actor network hidden dimensions.
+    "batch_size": 512,  # Batch size.
+    "actor_hidden_dims": (256, 256, 256),  # Actor network hidden dimensions.
     "discount": 0.99,  # Discount factor (unused by default; can be used for geometric goal sampling in GCDataset).
     "clip_threshold": 100.0,
     "const_std": False,  # Whether to use constant standard deviation for the actor.
@@ -83,12 +83,35 @@ class NFGCBCAgent(flax.struct.PyTreeNode):
     @partial(jax.jit, static_argnames=['num_eval_episodes'])
     def get_actions(self, observation, goal, num_eval_episodes=None, seed= None):
 
-        prior_sample = self.prior.sample(sample_shape=(1,), seed=seed)
+        prior_sample = self.prior.sample(sample_shape=(num_eval_episodes,), seed=seed)
         obs_goal = jnp.concatenate([observation, goal], axis=-1).astype(jnp.float32).reshape(1,-1)
         encode_obs_goal = self.network.select("encoder")(obs_goal)
         action, _ = self.network.select("actor")(prior_sample, encode_obs_goal, reverse=True)
 
         return action
+
+    @partial(jax.jit, static_argnames=['num_eval_episodes'])
+    def get_denoised_action(state, observation, goal, num_eval_episodes=None, seed= None):
+         
+        def log_prob_fn(x, y):
+            z, logdets = self.network.select("actor")(x, y)
+            logprob = self.prior.log_prob(z) + logdets
+            return logprob.sum()
+        
+        prior_sample = prior.sample(sample_shape=(num_eval_episodes,), seed= seed)
+        observation_goal = jnp.concatenate([observation, goal], axis=-1).astype(jnp.float32)
+        observation_goal_z = self.network.select("encoder")(observation_goal)
+        action, _ = self.network.select("actor")(
+            prior_sample, 
+            observation_goal_z, 
+            reverse=True, 
+            )
+        
+        action = jax.lax.stop_gradient(action)
+        action_score = jax.grad(log_prob_fn)(action, observation_goal_z)
+        action = action + args.noise_std**2 * action_score
+        return action
+
 
     @classmethod
     def create(cls, seed, ex_observations, ex_actions, cfg):
