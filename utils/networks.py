@@ -15,6 +15,7 @@ class MLP(nn.Module):
     activation: Any = nn.relu
     activate_final: bool = False
     kernel_init: Any = default_init()
+    bias_init: Any = None
     layer_norm: bool = False
 
     @nn.compact

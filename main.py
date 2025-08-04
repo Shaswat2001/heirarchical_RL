@@ -75,9 +75,6 @@ def main(args):
             last_time = time.time()
             # print(train_metrics)
             train_metrics = sanitize_metrics(train_metrics)
-            if train_metrics["training/actor/actor_loss"] < actor_loss:
-                actor_loss = train_metrics["training/actor/actor_loss"]
-                save_agent(agent, args.save_dir, 0)
             wandb.log(sanitize_metrics(train_metrics), step=i)
 
         # Evaluate agent.
@@ -95,6 +92,7 @@ def main(args):
             for task_id in tqdm.trange(1, num_tasks + 1):
                 task_name = task_infos[task_id - 1]['task_name']
                 if "nf" in args.agents:
+
                     eval_info, cur_renders = evaluate_nf(
                         agent=eval_agent,
                         envs=envs,
@@ -151,9 +149,9 @@ if __name__ == "__main__":
     parser.add_argument('--restore_epoch', type=int, default=None, help='Restore epoch.')
 
     # Training steps and logging
-    parser.add_argument('--offline_steps', type=int, default=30000000, help='Number of offline steps.')
-    parser.add_argument('--log_interval', type=int, default=10000, help='Logging interval.')
-    parser.add_argument('--eval_interval', type=int, default=250000, help='Evaluation interval.')
+    parser.add_argument('--offline_steps', type=int, default=1000000, help='Number of offline steps.')
+    parser.add_argument('--log_interval', type=int, default=5000, help='Logging interval.')
+    parser.add_argument('--eval_interval', type=int, default=100000, help='Evaluation interval.')
     parser.add_argument('--save_interval', type=int, default=100000, help='Saving interval.')
 
     # Evaluation

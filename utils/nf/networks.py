@@ -2,15 +2,52 @@ import distrax
 import jax
 import jax.numpy as jnp
 import flax.linen as nn
+from functools import partial
 
 from typing import Any, Sequence, Optional
-from utils.networks import MLP
 
 def create_prior(input_dim):
 
     loc = jnp.zeros(input_dim, dtype=jnp.float32)
     cov = jnp.eye(input_dim, dtype=jnp.float32)
     return distrax.MultivariateNormalFullCovariance(loc=loc, covariance_matrix= cov)
+
+def kernel_init(key, shape, dtype=jnp.float32):
+    in_features = shape[0]
+    k = jnp.sqrt( 1.0 / in_features )
+    return jax.random.uniform(key, shape, dtype, minval=-k, maxval=k)
+
+def bias_init(key, shape, dtype, in_features):
+    k = jnp.sqrt( 1.0 / in_features )
+    return jax.random.uniform(key, shape, dtype, minval=-k, maxval=k)
+
+class MLP(nn.Module):
+
+    hidden_layers: Sequence[int]
+    activation: Any = nn.relu
+    activate_final: bool = False
+    kernel_init: Any = kernel_init
+    bias_init: Any = bias_init
+    layer_norm: bool = False
+
+    @nn.compact
+    def __call__(self, x):
+        
+        for i, size in enumerate(self.hidden_layers):
+            if i==0:
+                continue
+            if i == len(self.hidden_layers)-1:
+                x = nn.Dense(size, kernel_init=jax.nn.initializers.zeros)(x)
+            else:
+                x = nn.Dense(size, kernel_init=self.kernel_init, bias_init=partial(self.bias_init, in_features=self.hidden_layers[i-1]))(x)
+            if i + 1 < len(self.hidden_layers) or self.activate_final:
+                x = self.activation(x)
+                if self.layer_norm:
+                    x = nn.LayerNorm()(x)
+                
+            if i == len(self.hidden_layers) - 2:
+                self.sow('intermediates', 'feature', x)
+        return x
 
 class PLU(nn.Module):
     features: int

@@ -12,7 +12,7 @@ NFGCBC_CONFIG_DICT = {
     "agent_name": 'nfgcbc',  # Agent name.
     "lr": 3e-4,  # Learning rate.
     "batch_size": 512,  # Batch size.
-    "actor_hidden_dims": (256, 256, 256),  # Actor network hidden dimensions.
+    "actor_hidden_dims": (512, 512, 512),  # Actor network hidden dimensions.
     "discount": 0.99,  # Discount factor (unused by default; can be used for geometric goal sampling in GCDataset).
     "clip_threshold": 100.0,
     "const_std": False,  # Whether to use constant standard deviation for the actor.
@@ -30,6 +30,7 @@ NFGCBC_CONFIG_DICT = {
     "gc_negative": True,  # Unused (defined for compatibility with GCDataset).
     "num_blocks": 6,
     "encode_dim": 64,
+    "channels": 256, 
     "noise_std": 0.1
 
 }
@@ -128,10 +129,12 @@ class NFGCBCAgent(flax.struct.PyTreeNode):
         observation_dim = ex_observations.shape[-1]
         encode_dim = _cfg["encode_dim"]
 
+        network_dims = (action_dim+encode_dim, _cfg["channels"]+encode_dim, _cfg["channels"], action_dim//2)
+
         ex_encode = jnp.zeros((1, encode_dim))
         nvp_def = RealNVP(
             _cfg["num_blocks"],
-            (*_cfg["actor_hidden_dims"], action_dim//2)
+            network_dims
         )
 
         encode_def = RealNVPEncoder(
