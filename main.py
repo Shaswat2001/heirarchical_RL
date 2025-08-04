@@ -13,7 +13,7 @@ from agents import agents
 import jax
 import jax.numpy as jnp
 from utils.buffers import buffers, Dataset
-from utils.env_utils import make_env_and_datasets, make_sai_datasets 
+from utils.env_utils import make_env_and_datasets 
 from utils.logging import get_exp_name, setup_wandb, get_wandb_video
 from utils.evaluation import *
 from utils.flax_utils import save_agent
@@ -29,16 +29,13 @@ def sanitize_metrics(metrics):
 
 def main(args):
 
-    exp_name = get_exp_name(args.env_name, args.agents)
-    setup_wandb(project='hrl-arenaX', group=args.run_group, name=exp_name)
+    # exp_name = get_exp_name(args.env_name, args.agents)
+    # setup_wandb(project='hrl-arenaX', group=args.run_group, name=exp_name)
 
-    args.save_dir = os.path.join(args.save_dir, wandb.run.project, args.run_group, exp_name)
-    os.makedirs(args.save_dir, exist_ok=True)
+    # args.save_dir = os.path.join(args.save_dir, wandb.run.project, args.run_group, exp_name)
+    # os.makedirs(args.save_dir, exist_ok=True)
 
-    if args.env_module == "ogbench":
-        env, train_dataset, val_dataset = make_env_and_datasets(args.env_name)
-    else:
-        env, train_dataset, val_dataset = make_sai_datasets(args.env_name)
+    env, envs, train_dataset, val_dataset = make_env_and_datasets(args.env_name, args=args)
         
     random.seed(args.seed)
     np.random.seed(args.seed)
@@ -97,18 +94,27 @@ def main(args):
             num_tasks = args.eval_tasks if args.eval_tasks is not None else len(task_infos)
             for task_id in tqdm.trange(1, num_tasks + 1):
                 task_name = task_infos[task_id - 1]['task_name']
-                eval_info, trajs, cur_renders = evaluate(
-                    agent=eval_agent,
-                    env=env,
-                    task_id=task_id,
-                    config=agent_config,
-                    num_eval_episodes=args.eval_episodes,
-                    num_video_episodes=args.video_episodes,
-                    video_frame_skip=args.video_frame_skip,
-                    eval_temperature=args.eval_temperature,
-                    eval_gaussian=args.eval_gaussian,
-                )
-                renders.extend(cur_renders)
+                if "nf" in args.agents:
+                    eval_info, cur_renders = evaluate_nf(
+                        agent=eval_agent,
+                        envs=envs,
+                        task_id=task_id,
+                        num_eval_episodes=args.eval_episodes,
+                    )
+                else:
+                    eval_info, cur_renders = evaluate(
+                        agent=eval_agent,
+                        env=env,
+                        task_id=task_id,
+                        config=agent_config,
+                        num_eval_episodes=args.eval_episodes,
+                        num_video_episodes=args.video_episodes,
+                        video_frame_skip=args.video_frame_skip,
+                        eval_temperature=args.eval_temperature,
+                        eval_gaussian=args.eval_gaussian,
+                    )
+                if cur_renders is not None:
+                    renders.extend(cur_renders)
                 metric_names = ['success']
                 eval_metrics.update(
                     {f'evaluation/{task_name}_{k}': v for k, v in eval_info.items() if k in metric_names}
@@ -151,7 +157,7 @@ if __name__ == "__main__":
     parser.add_argument('--save_interval', type=int, default=100000, help='Saving interval.')
 
     # Evaluation
-    parser.add_argument('--eval_episodes', type=int, default=4, help='Number of episodes for each task.')
+    parser.add_argument('--eval_episodes', type=int, default=50, help='Number of episodes for each task.')
     parser.add_argument('--eval_temperature', type=float, default=0, help='Actor temperature for evaluation.')
     parser.add_argument('--eval_gaussian', type=float, default=None, help='Action Gaussian noise for evaluation.')
     parser.add_argument('--eval_tasks', type=float, default=None, help='Number of tasks to evaluate (None for all).')

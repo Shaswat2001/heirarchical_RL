@@ -9,6 +9,16 @@ from gymnasium.spaces import Box
 
 import ogbench
 from utils.buffers import Dataset
+from stable_baselines3.common.vec_env import DummyVecEnv
+
+def make_vec_env(env_id: str, rank: int, seed: int = 0):
+
+    def _init():
+        env = ogbench.make_env_and_datasets(env_id, env_only=True)
+        env.reset(seed = seed + rank)
+        return env
+
+    return _init
 
 
 class EpisodeMonitor(gymnasium.Wrapper):
@@ -76,7 +86,7 @@ class FrameStackWrapper(gymnasium.Wrapper):
         return self.get_observation(), reward, terminated, truncated, info
 
 
-def make_env_and_datasets(dataset_name, frame_stack=None):
+def make_env_and_datasets(dataset_name, frame_stack=None, vectorize=True, args=None):
     """Make OGBench environment and datasets.
 
     Args:
@@ -94,26 +104,15 @@ def make_env_and_datasets(dataset_name, frame_stack=None):
     if frame_stack is not None:
         env = FrameStackWrapper(env, frame_stack)
 
+    if vectorize:
+        envs = DummyVecEnv([make_vec_env(dataset_name, i, args.seed) for i in range(args.eval_episodes)])
+    else:
+        envs = None
+
     env.reset()
 
-    return env, train_dataset, val_dataset
+    return env, envs, train_dataset, val_dataset
 
-def make_sai_datasets(env_name):
-
-    dir_name = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
-
-    env = gymnasium.make(env_name, keyframe="init_frame")
-
-    with np.load(f'{dir_name}/dataset/{env_name}/train/FrankaGolfCourseEnv-v0_train_augmented_new.npz', allow_pickle=True) as data:
-        train_data = {key: data[key] for key in data}
-
-    with np.load(f'{dir_name}/dataset/{env_name}/val/{env_name}_val.npz', allow_pickle=True) as data:
-        val_data = {key: data[key] for key in data}
-    
-    train_dataset = Dataset.create(**train_data)
-    val_dataset = Dataset.create(**val_data)
-
-    return env, train_dataset, val_dataset
 
 
 

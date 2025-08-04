@@ -29,7 +29,9 @@ NFGCBC_CONFIG_DICT = {
     "actor_geom_sample": False,  # Whether to use geometric sampling for future actor goals.
     "gc_negative": True,  # Unused (defined for compatibility with GCDataset).
     "num_blocks": 6,
-    "encode_dim": 64
+    "encode_dim": 64,
+    "noise_std": 0.1
+
 }
 
 class NFGCBCAgent(flax.struct.PyTreeNode):
@@ -84,21 +86,21 @@ class NFGCBCAgent(flax.struct.PyTreeNode):
     def get_actions(self, observation, goal, num_eval_episodes=None, seed= None):
 
         prior_sample = self.prior.sample(sample_shape=(num_eval_episodes,), seed=seed)
-        obs_goal = jnp.concatenate([observation, goal], axis=-1).astype(jnp.float32).reshape(1,-1)
+        obs_goal = jnp.concatenate([observation, goal], axis=-1).astype(jnp.float32)
         encode_obs_goal = self.network.select("encoder")(obs_goal)
         action, _ = self.network.select("actor")(prior_sample, encode_obs_goal, reverse=True)
 
         return action
 
     @partial(jax.jit, static_argnames=['num_eval_episodes'])
-    def get_denoised_action(state, observation, goal, num_eval_episodes=None, seed= None):
+    def get_denoised_action(self, observation, goal, num_eval_episodes=None, seed= None):
          
         def log_prob_fn(x, y):
             z, logdets = self.network.select("actor")(x, y)
             logprob = self.prior.log_prob(z) + logdets
             return logprob.sum()
         
-        prior_sample = prior.sample(sample_shape=(num_eval_episodes,), seed= seed)
+        prior_sample = self.prior.sample(sample_shape=(num_eval_episodes,), seed= seed)
         observation_goal = jnp.concatenate([observation, goal], axis=-1).astype(jnp.float32)
         observation_goal_z = self.network.select("encoder")(observation_goal)
         action, _ = self.network.select("actor")(
@@ -109,7 +111,7 @@ class NFGCBCAgent(flax.struct.PyTreeNode):
         
         action = jax.lax.stop_gradient(action)
         action_score = jax.grad(log_prob_fn)(action, observation_goal_z)
-        action = action + args.noise_std**2 * action_score
+        action = action + self.config["noise_std"]**2 * action_score
         return action
 
 

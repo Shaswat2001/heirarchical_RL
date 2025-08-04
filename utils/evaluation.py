@@ -33,6 +33,58 @@ def add_to(dict_of_lists, single_dict):
     for k, v in single_dict.items():
         dict_of_lists[k].append(v)
 
+def evaluate_nf(
+    agent,
+    envs,
+    task_id=None,
+    seed=0,
+    denoise_action=False,
+    num_eval_episodes=50,
+):
+    
+    if denoise_action:
+        actor_fn = supply_rng(agent.get_denoised_action, rng=jax.random.PRNGKey(np.random.randint(0, 2**32)))
+    else:
+        actor_fn = supply_rng(agent.get_actions, rng=jax.random.PRNGKey(np.random.randint(0, 2**32)))
+
+    stats = defaultdict(list)
+
+    results = []
+    for idx, env in enumerate(envs.envs):
+        results.append(env.reset(seed=seed+idx, options=dict(task_id=task_id, render_goal=False)))
+
+    done = np.zeros((num_eval_episodes,), dtype=bool)
+    success = np.zeros((num_eval_episodes,))
+
+    obs_list, info_list = zip(*results)
+    goal_list = []
+    for info in info_list:
+        goal_list.append( info.get('goal') )
+    observation = np.stack(obs_list, axis=0)
+    goal = np.stack(goal_list, axis=0)
+    
+    step = 0
+    while not np.all(done):
+        # action_sample_key, eval_key = jax.random.split(eval_key)
+        action = actor_fn(observation=observation, goal=goal, num_eval_episodes=num_eval_episodes)
+        action = np.clip(jax.device_get(action), -1, 1)
+        
+        next_observation, reward, next_done, info = envs.step(action)
+        step += 1
+        step_success = []
+        for i in info:
+            step_success.append( i.get('success') )
+        
+        success = (1-done) * np.array(step_success) + done * success
+
+        done = np.logical_or(next_done, done) 
+        observation = next_observation
+    
+    stats[f'evaluation/{task_id}_success'] = success
+    stats[f'evaluation/overall_success'] = np.append(stats[f'evaluation/overall_success'], success)
+
+    return stats, None
+    
 def evaluate(
     agent,
     env,
@@ -61,12 +113,12 @@ def evaluate(
         A tuple containing the statistics, trajectories, and rendered videos.
     """
     actor_fn = supply_rng(agent.get_actions, rng=jax.random.PRNGKey(np.random.randint(0, 2**32)))
-    trajs = []
+    # trajs = []
     stats = defaultdict(list)
 
     renders = []
     for i in trange(num_eval_episodes + num_video_episodes):
-        traj = defaultdict(list)
+        # traj = defaultdict(list)
         should_render = i >= num_eval_episodes
 
         observation, info = env.reset(options=dict(task_id=task_id, render_goal=should_render))
@@ -76,7 +128,7 @@ def evaluate(
         step = 0
         render = []
         while not done:
-            action = actor_fn(observation=observation, goal=goal)
+            action = actor_fn(observation=observation, goal=goal, temperature=eval_temperature)
             action = np.array(action)
             if not config.get('discrete'):
                 if eval_gaussian is not None:
@@ -85,7 +137,7 @@ def evaluate(
 
             if len(action.shape) == 2:
                 action = action[0]
-                
+
             next_observation, reward, terminated, truncated, info = env.step(action)
             done = terminated or truncated
             step += 1
@@ -97,23 +149,23 @@ def evaluate(
                 else:
                     render.append(frame)
 
-            transition = dict(
-                observation=observation,
-                next_observation=next_observation,
-                action=action,
-                reward=reward,
-                done=done,
-                info=info,
-            )
-            add_to(traj, transition)
+            # transition = dict(
+            #     observation=observation,
+            #     next_observation=next_observation,
+            #     action=action,
+            #     reward=reward,
+            #     done=done,
+            #     info=info,
+            # )
+            # add_to(traj, transition)
             observation = next_observation
         if i < num_eval_episodes:
             add_to(stats, flatten(info))
-            trajs.append(traj)
+            # trajs.append(traj)
         else:
             renders.append(np.array(render))
 
     for k, v in stats.items():
         stats[k] = np.mean(v)
 
-    return stats, trajs, renders
+    return stats, renders
