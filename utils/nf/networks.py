@@ -12,12 +12,63 @@ def create_prior(input_dim):
     cov = jnp.eye(input_dim, dtype=jnp.float32)
     return distrax.MultivariateNormalFullCovariance(loc=loc, covariance_matrix= cov)
 
+class PLU(nn.Module):
+    features: int
+    key: jax.random.PRNGKey = jax.random.PRNGKey(0)
+
+    def setup(self):
+        d = self.features
+        key = self.key
+        
+        w_shape = (d, d)
+        w_init = nn.initializers.orthogonal()(key, w_shape)
+        P, L, U = jax.scipy.linalg.lu(w_init)
+        s = jnp.diag(U)
+        U = U - jnp.diag(s)
+
+        self.P = P
+        self.P_inv = jax.scipy.linalg.inv(P)
+        
+        self.L_init = jnp.tril(L, k=-1)
+        self.U_init = jnp.triu(U, k=1)
+        self.s_init = s
+
+    @nn.compact
+    def __call__(self, x, reverse: bool = False):
+        d = self.features
+
+        L_free = self.param("L", lambda rng: self.L_init)
+        U_free = self.param("U", lambda rng: self.U_init)
+        
+        L = jnp.tril(L_free, k=-1) + jnp.eye(d)
+        U = jnp.triu(U_free, k=1)
+        s = self.param("s", lambda rng: self.s_init)
+        
+        W = self.P @ L @ (U + jnp.diag(s))
+
+        if not reverse:
+            z = jnp.dot(x, W)
+            logdet = jnp.sum(jnp.log(jnp.abs(s)))
+            return z , jnp.expand_dims( logdet, 0)
+        
+        else:
+            
+            U_inv = jax.scipy.linalg.solve_triangular(U + jnp.diag(s), jnp.eye(self.features), lower=False)
+            L_inv = jax.scipy.linalg.solve_triangular(L, jnp.eye(self.features), lower=True, unit_diagonal=True)
+            
+            W_inv = U_inv @ L_inv @ self.P_inv
+            
+            z = jnp.dot(x, W_inv)
+            logdet = jnp.sum(jnp.log(jnp.abs(s)))
+            return z, -jnp.expand_dims( logdet, 0)
+    
 class CouplingLayer(nn.Module):
 
     hidden_layers: Sequence[int]
 
     def setup(self):
         
+        self.l = PLU(features=self.hidden_layers[-1]*2)
         self.s = MLP(self.hidden_layers, activation= nn.leaky_relu, activate_final= False, layer_norm= True)
         self.t = MLP(self.hidden_layers, activation= nn.leaky_relu, activate_final= False, layer_norm= True)
 
@@ -29,6 +80,8 @@ class CouplingLayer(nn.Module):
             return self.forward(x, y)
     
     def forward(self, x, y):
+
+        x, log_det = self.l(x)
         
         x1, x2 = jnp.hsplit(x, 2)
         s = self.s(jnp.concatenate([x1, y], axis=-1))
@@ -36,7 +89,7 @@ class CouplingLayer(nn.Module):
 
         x2 = (x2 - t) * jnp.exp(-s)
         x = jnp.concatenate([x1, x2], axis=1)
-        log_det = -jnp.sum(s, axis=1)
+        log_det += -jnp.sum(s, axis=1)
 
         return x, log_det
 
@@ -49,7 +102,10 @@ class CouplingLayer(nn.Module):
 
         z2 = z2 * jnp.exp(s) + t
         z = jnp.concatenate([z1, z2], axis=1)
-        log_det = jnp.sum(s, axis=1)
+
+        z, log_det = self.l(z, reverse=True)
+
+        log_det += jnp.sum(s, axis=1)
 
         return z, log_det
 

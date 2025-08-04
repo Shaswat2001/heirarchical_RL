@@ -107,7 +107,7 @@ class GCDataset:
             # Geometric sampling.
             offsets = np.random.geometric(p=1 - self.config['discount'], size=batch_size)  # in [1, inf)
             traj_goal_idxs = np.minimum(idxs + offsets, final_state_idxs)
-=        else:
+        else:
             # Uniform sampling.
             distances = np.random.rand(batch_size)  # in [0, 1)
             traj_goal_idxs = np.round(
