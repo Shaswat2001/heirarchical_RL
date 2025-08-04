@@ -11,11 +11,10 @@ from utils.flax_utils import ModuleDict, TrainState, nonpytree_field
 NFGCBC_CONFIG_DICT = {
     "agent_name": 'nfgcbc',  # Agent name.
     "lr": 3e-4,  # Learning rate.
-    "batch_size": 512,  # Batch size.
+    "batch_size": 256,  # Batch size.
     "actor_hidden_dims": (512, 512, 512),  # Actor network hidden dimensions.
     "discount": 0.99,  # Discount factor (unused by default; can be used for geometric goal sampling in GCDataset).
     "clip_threshold": 100.0,
-    "const_std": False,  # Whether to use constant standard deviation for the actor.
     "discrete": False,  # Whether the action space is discrete.
     # Dataset hyperparameters.
     "dataset_class": 'GCDataset',  # Dataset class name.
@@ -46,13 +45,16 @@ class NFGCBCAgent(flax.struct.PyTreeNode):
     def actor_loss(self, batch, grad_params, rng):
 
         obs_goal = jnp.concatenate([batch["observations"], batch["actor_goals"]], axis=-1).astype(jnp.float32)
-        encod = self.network.select("encoder")(obs_goal)
+        encod = self.network.select("encoder")(obs_goal, params=grad_params)
         z, logdets = self.network.select("actor")(batch["actions"], encod, params=grad_params)
         loss = - (self.prior.log_prob(z) + logdets).mean()
+        entropy, mse = self.get_entropy(batch, rng)
         info = {
                     'actor_loss' : loss,
                     'actor_logdets' : logdets.mean(),
-                    'actor_norms_layer__0' : jnp.square(z).mean()
+                    'actor_norms_layer__0' : jnp.square(z).mean(),
+                    'entropy': entropy,
+                    'mse': mse
                 }
         
         return loss, info
@@ -82,9 +84,20 @@ class NFGCBCAgent(flax.struct.PyTreeNode):
         new_network, info = self.network.apply_loss_fn(loss_fn=loss_fn)
 
         return self.replace(network=new_network, rng=new_rng), info
+    
+    @jax.jit
+    def get_entropy(self, batch, seed=None):
+
+        obs_goal = jnp.concatenate([batch["observations"], batch["actor_goals"]], axis=-1).astype(jnp.float32)
+        prior_sample = self.prior.sample(sample_shape=(obs_goal.shape[0],), seed=seed)
+        encode_obs_goal = self.network.select("encoder")(obs_goal)
+        p_actions, p_logdets = self.network.select("actor")(prior_sample, encode_obs_goal, reverse=True)
+        entropy = (self.prior.log_prob(prior_sample) - p_logdets).mean() 
+        mse = ((p_actions - batch["actions"] ) **2).mean()
+        return entropy, mse
 
     @partial(jax.jit, static_argnames=['num_eval_episodes'])
-    def get_actions(self, observation, goal, num_eval_episodes=None, seed= None):
+    def get_actions(self, observation, goal, num_eval_episodes=None, seed=None):
 
         prior_sample = self.prior.sample(sample_shape=(num_eval_episodes,), seed=seed)
         obs_goal = jnp.concatenate([observation, goal], axis=-1).astype(jnp.float32)

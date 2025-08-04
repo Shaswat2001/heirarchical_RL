@@ -39,7 +39,7 @@ def main(args):
         
     random.seed(args.seed)
     np.random.seed(args.seed)
-
+    key = jax.random.PRNGKey(args.seed)
     (agent_class, agent_config) = agents[args.agents]
 
     buffer_class = buffers[agent_config["dataset_class"]]
@@ -60,7 +60,12 @@ def main(args):
     actor_loss = 1000
     for i in tqdm.tqdm(range(1, args.offline_steps + 1), smoothing=0.1, dynamic_ncols=True):
         # Update agent.
+        sample_key, key = jax.random.split(key)
         batch = train_dataset.sample(agent_config['batch_size'])
+
+        # eps = 0.1 * jax.random.normal(sample_key, shape=batch["actions"].shape)
+        # batch["actions"] = batch["actions"] + eps
+
         agent, update_info = agent.update(batch)
 
         # Log metrics.
@@ -68,6 +73,8 @@ def main(args):
             train_metrics = {f'training/{k}': v for k, v in update_info.items()}
             if val_dataset is not None:
                 val_batch = val_dataset.sample(agent_config['batch_size'])
+                # eps = 0.1 * jax.random.normal(sample_key, shape=val_batch["actions"].shape)
+                # val_batch["actions"] = val_batch["actions"] + eps
                 _, val_info = agent.total_loss(val_batch, grad_params=None)
                 train_metrics.update({f'validation/{k}': v for k, v in val_info.items()})
             train_metrics['time/epoch_time'] = (time.time() - last_time) / args.log_interval
@@ -97,6 +104,7 @@ def main(args):
                         agent=eval_agent,
                         envs=envs,
                         task_id=task_id,
+                        denoise_action=False,
                         num_eval_episodes=args.eval_episodes,
                     )
                 else:

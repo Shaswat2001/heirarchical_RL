@@ -47,7 +47,7 @@ def evaluate_nf(
     else:
         actor_fn = supply_rng(agent.get_actions, rng=jax.random.PRNGKey(np.random.randint(0, 2**32)))
 
-    stats = defaultdict(list)
+    stats = defaultdict(lambda: np.array([]))
 
     results = []
     for idx, env in enumerate(envs.envs):
@@ -80,7 +80,7 @@ def evaluate_nf(
         done = np.logical_or(next_done, done) 
         observation = next_observation
     
-    stats[f'success'] = success.mean()
+    stats[f'success'] = np.mean(success)
 
     return stats, None
     
