@@ -47,9 +47,9 @@ class NFGCBCAgent(flax.struct.PyTreeNode):
         z, logdets = self.network.select("actor")(batch["actions"], encod, params=grad_params)
         loss = - (self.prior.log_prob(z) + logdets).mean()
         info = {
-                    'actor/loss' : loss,
-                    'actor/logdets' : logdets.mean(),
-                    'actor/norms/layer__0' : jnp.square(z).mean()
+                    'actor_loss' : loss,
+                    'actor_logdets' : logdets.mean(),
+                    'actor_norms_layer__0' : jnp.square(z).mean()
                 }
         
         return loss, info

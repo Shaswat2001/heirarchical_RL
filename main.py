@@ -29,11 +29,11 @@ def sanitize_metrics(metrics):
 
 def main(args):
 
-    # exp_name = get_exp_name(args.env_name, args.agents)
-    # setup_wandb(project='hrl-arenaX', group=args.run_group, name=exp_name)
+    exp_name = get_exp_name(args.env_name, args.agents)
+    setup_wandb(project='hrl-arenaX', group=args.run_group, name=exp_name)
 
-    # args.save_dir = os.path.join(args.save_dir, wandb.run.project, args.run_group, exp_name)
-    # os.makedirs(args.save_dir, exist_ok=True)
+    args.save_dir = os.path.join(args.save_dir, wandb.run.project, args.run_group, exp_name)
+    os.makedirs(args.save_dir, exist_ok=True)
 
     if args.env_module == "ogbench":
         env, train_dataset, val_dataset = make_env_and_datasets(args.env_name)
