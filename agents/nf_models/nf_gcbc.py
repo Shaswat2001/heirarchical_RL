@@ -28,8 +28,8 @@ NFGCBC_CONFIG_DICT = {
     "actor_p_randomgoal": 0.0,  # Probability of using a random state as the actor goal.
     "actor_geom_sample": False,  # Whether to use geometric sampling for future actor goals.
     "gc_negative": True,  # Unused (defined for compatibility with GCDataset).
-    "num_blocks": 12,
-    "encode_dim": 100
+    "num_blocks": 6,
+    "encode_dim": 64
 }
 
 class NFGCBCAgent(flax.struct.PyTreeNode):
