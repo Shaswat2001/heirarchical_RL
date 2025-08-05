@@ -3,7 +3,7 @@ import jax
 import jax.numpy as jnp
 import flax.linen as nn
 from functools import partial
-
+from flax import struct
 from typing import Any, Sequence, Optional
 
 def create_prior(input_dim):
@@ -51,7 +51,7 @@ class MLP(nn.Module):
 
 class PLU(nn.Module):
     features: int
-    key: jax.random.PRNGKey = jax.random.PRNGKey(0)
+    key: jax.Array = struct.field(default_factory=lambda: jax.random.PRNGKey(0))
 
     def setup(self):
         d = self.features

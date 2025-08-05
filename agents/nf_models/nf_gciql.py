@@ -18,7 +18,9 @@ NFGCIQL_CONFIG_DICT = {
     "discount": 0.99,  # Discount factor (unused by default; can be used for geometric goal sampling in GCDataset).
     "tau": 0.005,
     "clip_threshold": 100,
+    "beta": 0.3, # Temperature in AWR.
     "expectile_tau": 0.9,  # IQL expectile.
+    "layer_norm": True,  # Whether to use layer normalization.
     "discount": 0.99,  # Discount factor (unused by default; can be used for geometric goal sampling in GCDataset).
     "const_std": True,  # Whether to use constant standard deviation for the actor.
     "discrete": False,  # Whether the action space is discrete.
@@ -96,12 +98,12 @@ class NFGCIQLAgent(flax.struct.PyTreeNode):
         q = self.network.select("critic")(batch["observations"], batch["actor_goals"], batch["actions"])
 
         adv = q - v
-        exp_adv = jnp.minimum(jnp.exp(self.config["beta"]*adv),100)
+        exp_adv = jnp.minimum(jnp.exp(self.config["beta"]*adv),100).squeeze(1)
 
         obs_goal = jnp.concatenate([batch["observations"], batch["actor_goals"]], axis=-1).astype(jnp.float32)
         encod = self.network.select("encoder")(obs_goal, params=grad_params)
         z, logdets = self.network.select("actor")(batch["actions"], encod, params=grad_params)
-        loss = -exp_adv*(self.prior.log_prob(z) + logdets).mean()
+        loss = -(exp_adv*(self.prior.log_prob(z) + logdets)).mean()
         entropy, mse = self.get_entropy(batch, rng)
         info = {
                     'actor_loss' : loss,

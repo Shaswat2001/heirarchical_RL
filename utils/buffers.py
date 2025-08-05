@@ -115,7 +115,7 @@ class GCDataset:
             ).astype(int)
 
         if p_curgoal == 1.0:
-            goal_idxs = idxs
+            goal_idxs = traj_goal_idxs
         else:
 
             goal_idxs = np.where(
