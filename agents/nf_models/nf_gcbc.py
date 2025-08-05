@@ -30,7 +30,8 @@ NFGCBC_CONFIG_DICT = {
     "num_blocks": 6,
     "encode_dim": 64,
     "channels": 256, 
-    "noise_std": 0.1
+    "noise_std": 0.1,
+    "weight_decay": 1e-6
 
 }
 
@@ -167,7 +168,14 @@ class NFGCBCAgent(flax.struct.PyTreeNode):
 
         network_def = ModuleDict(network)
 
-        network_tx = optax.adam(learning_rate=_cfg['lr'])
+        lr_scheduler = optax.warmup_cosine_decay_schedule(
+                    init_value=0.0, peak_value=_cfg["lr"],
+                    warmup_steps=500, decay_steps=1000000,
+                    end_value=1e-6,
+        )
+        network_tx = optax.adamw(learning_rate=lr_scheduler, weight_decay=_cfg["weight_decay"])
+
+        # network_tx = optax.adam(learning_rate=_cfg['lr'])
         network_params = network_def.init(init_rng, **network_args)['params']
         network = TrainState.create(network_def, network_params, tx=network_tx)
 

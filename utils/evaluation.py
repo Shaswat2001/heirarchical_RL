@@ -37,7 +37,7 @@ def evaluate_nf(
     agent,
     envs,
     task_id=None,
-    seed=0,
+    seed=1,
     denoise_action=False,
     num_eval_episodes=50,
 ):
