@@ -30,10 +30,10 @@ NFGCIQL_CONFIG_DICT = {
     "value_p_trajgoal": 0.5,  # Unused (defined for compatibility with GCDataset).
     "value_p_randomgoal": 0.3,  # Unused (defined for compatibility with GCDataset).
     "value_geom_sample": True,  # Unused (defined for compatibility with GCDataset).
-    "actor_p_curgoal": 0.0,  # Probability of using the current state as the actor goal.
-    "actor_p_trajgoal": 1.0,  # Probability of using a future state in the same trajectory as the actor goal.
+    "actor_p_curgoal": 1.0,  # Probability of using the current state as the actor goal.
+    "actor_p_trajgoal": 0.0,  # Probability of using a future state in the same trajectory as the actor goal.
     "actor_p_randomgoal": 0.0,  # Probability of using a random state as the actor goal.
-    "actor_geom_sample": False,  # Whether to use geometric sampling for future actor goals.
+    "actor_geom_sample": True,  # Whether to use geometric sampling for future actor goals.
     "gc_negative": True,  # Unused (defined for compatibility with GCDataset).
     "num_blocks": 6,
     "encode_dim": 64,

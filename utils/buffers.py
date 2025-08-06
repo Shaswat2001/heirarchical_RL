@@ -200,7 +200,7 @@ class HGCDataset(GCDataset):
                 (np.minimum(idxs + 1, final_state_idxs) * distances + final_state_idxs * (1 - distances))
             ).astype(int)
         if p_curgoal == 1.0:
-            goal_idxs = idxs
+            goal_idxs = traj_goal_idxs
         else:
             goal_idxs = np.where(
                 np.random.rand(batch_size) < p_trajgoal / (1.0 - p_curgoal), traj_goal_idxs, random_goal_idxs
