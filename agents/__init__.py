@@ -4,7 +4,8 @@ from .hiql import HIQLAgent, HIQL_CONFIG_DICT
 from .ris import RISAgent, RIS_CONFIG_DICT
 from .bc import BCAgent, BCMSEAgent, BC_CONFIG_DICT
 from .nf_models import NFGCBCAgent, NFGCBC_CONFIG_DICT, \
-                        NFGCIQLAgent, NFGCIQL_CONFIG_DICT
+                        NFGCIQLAgent, NFGCIQL_CONFIG_DICT, \
+                        NFHIQLAgent, NFHIQL_CONFIG_DICT
 
 agents = {
     "gcbc": (GCBCAgent, GCBC_CONFIG_DICT),
@@ -15,5 +16,6 @@ agents = {
     "bc": (BCAgent, BC_CONFIG_DICT),
     "bc_mse": (BCMSEAgent, BC_CONFIG_DICT),
     "nfgcbc": (NFGCBCAgent, NFGCBC_CONFIG_DICT),
-    "nfgciql": (NFGCIQLAgent, NFGCIQL_CONFIG_DICT)
+    "nfgciql": (NFGCIQLAgent, NFGCIQL_CONFIG_DICT),
+    "nfhiql": (NFHIQLAgent, NFHIQL_CONFIG_DICT)
 }

@@ -220,6 +220,7 @@ class NFGCIQLAgent(flax.struct.PyTreeNode):
 
         nvp_def = RealNVP(
             _cfg["num_blocks"],
+            action_dim,
             network_dims
         )
 

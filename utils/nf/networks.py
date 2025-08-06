@@ -100,12 +100,13 @@ class PLU(nn.Module):
             return z, -jnp.expand_dims( logdet, 0)
     
 class CouplingLayer(nn.Module):
-
+    
+    input_shape: int
     hidden_layers: Sequence[int]
 
     def setup(self):
         
-        self.l = PLU(features=self.hidden_layers[-1]*2)
+        self.l = PLU(features=self.input_shape)
         self.s = MLP(self.hidden_layers, activation= nn.leaky_relu, activate_final= False, layer_norm= True)
         self.t = MLP(self.hidden_layers, activation= nn.leaky_relu, activate_final= False, layer_norm= True)
 
@@ -117,13 +118,13 @@ class CouplingLayer(nn.Module):
             return self.forward(x, y)
     
     def forward(self, x, y):
-
+        
         x, log_det = self.l(x)
         
-        x1, x2 = jnp.hsplit(x, 2)
+        x1, x2 = jnp.array_split(x, 2, axis=1)
         s = self.s(jnp.concatenate([x1, y], axis=-1))
         t = self.t(jnp.concatenate([x1, y], axis=-1))
-
+        
         x2 = (x2 - t) * jnp.exp(-s)
         x = jnp.concatenate([x1, x2], axis=1)
         log_det += -jnp.sum(s, axis=1)
@@ -133,7 +134,7 @@ class CouplingLayer(nn.Module):
 
     def reverse(self, z, y):
         
-        z1, z2 = jnp.hsplit(z, 2)
+        z1, z2 = jnp.array_split(z, 2, axis=1)
         s = self.s(jnp.concatenate([z1, y], axis=-1))
         t = self.t(jnp.concatenate([z1, y], axis=-1))
 
@@ -149,12 +150,13 @@ class CouplingLayer(nn.Module):
 class RealNVP(nn.Module):
 
     num_blocks: int
+    input_shape: int
     hidden_layers: Sequence[int]
 
     def setup(self):
         
         self.blocks = [
-            CouplingLayer(self.hidden_layers)
+            CouplingLayer(self.input_shape, self.hidden_layers)
             for _ in range(self.num_blocks)
         ]
     

@@ -148,6 +148,7 @@ class NFGCBCAgent(flax.struct.PyTreeNode):
         ex_encode = jnp.zeros((1, encode_dim))
         nvp_def = RealNVP(
             _cfg["num_blocks"],
+            action_dim,
             network_dims
         )
 
