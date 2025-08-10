@@ -30,7 +30,7 @@ def sanitize_metrics(metrics):
 def main(args):
 
     exp_name = get_exp_name(args.env_name, args.agents)
-    setup_wandb(project='hrl-arenaX', group=args.run_group, name=exp_name)
+    setup_wandb(project='nf-hiql-icra', group=args.run_group, name=exp_name)
 
     args.save_dir = os.path.join(args.save_dir, wandb.run.project, args.run_group, exp_name)
     os.makedirs(args.save_dir, exist_ok=True)
@@ -96,6 +96,7 @@ def main(args):
 
             task_infos = env.unwrapped.task_infos if hasattr(env.unwrapped, 'task_infos') else env.task_infos
             num_tasks = args.eval_tasks if args.eval_tasks is not None else len(task_infos)
+            success = 0
             for task_id in tqdm.trange(1, num_tasks + 1):
                 task_name = task_infos[task_id - 1]['task_name']
                 if "nf" in args.agents:
@@ -128,12 +129,15 @@ def main(args):
                 for k, v in eval_info.items():
                     if k in metric_names:
                         overall_metrics[k].append(v)
-
+            success = overall_metrics["success"]
+            eval_metrics.update({"evaluation/success_rate": sum(success)/len(success)})
             wandb.log(sanitize_metrics(eval_metrics), step=i)
 
         # Save agent.
         if i % args.save_interval == 0:
             save_agent(agent, args.save_dir, i)
+
+    wandb.finish()
 
 
 if __name__ == "__main__":
@@ -142,11 +146,11 @@ if __name__ == "__main__":
 
     parser.add_argument('--run_group', type=str, default='Debug', help='Run group.')
     parser.add_argument('--seed', type=int, default=0, help='Random seed.')
-    parser.add_argument('--agents', type=str, default="nfgciql", help='Agent to load.')
+    parser.add_argument('--agents', type=str, default="nfhiql", help='Agent to load.')
 
     # Environment
     parser.add_argument('--env_module', type=str, default='ogbench', help='Environment (dataset) name.')
-    parser.add_argument('--env_name', type=str, default='antmaze-medium-navigate-v0', help='Environment (dataset) name.')
+    parser.add_argument('--env_name', type=str, default='cube-single-play-v0', help='Environment (dataset) name.')
     parser.add_argument('--dataset_dir', type=str, default="~/.ogbench/data", help='Dataset directory.')
     parser.add_argument('--dataset_replace_interval', type=int, default=1000, help='Dataset replace interval.')
     parser.add_argument('--num_datasets', type=int, default=None, help='Number of datasets to use.')
@@ -172,4 +176,6 @@ if __name__ == "__main__":
     parser.add_argument('--video_frame_skip', type=int, default=3, help='Frame skip for videos.')
     args = parser.parse_args()
 
-    main(args)
+    for i in range(5):
+        args.seed = args.seed + i
+        main(args)
