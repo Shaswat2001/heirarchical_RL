@@ -98,6 +98,9 @@ def make_env_and_datasets(dataset_name, frame_stack=None, vectorize=True, args=N
     """
     # Use compact dataset to save memory.
     env, train_dataset, val_dataset = ogbench.make_env_and_datasets(dataset_name, compact_dataset=True)
+    # half_size = len(next(iter(train_dataset.values()))) // 2
+    # print(half_size)
+    # train_dataset = {k: v[:half_size] for k, v in train_dataset.items()}
     train_dataset = Dataset.create(**train_dataset)
     val_dataset = Dataset.create(**val_dataset)
 
